@@ -1,0 +1,33 @@
+# GENERATED from theme/palette.sh by alacritty/generate-theme.sh — DO NOT EDIT.
+
+[colors.primary]
+background = "#1c1c1c"
+foreground = "#f8f8f8"
+
+[colors.cursor]
+text   = "#1c1c1c"
+cursor = "#f8f8f8"
+
+[colors.selection]
+text       = "CellForeground"
+background = "#3a3a3a"
+
+[colors.normal]
+black   = "#1c1c1c"
+red     = "#f7768e"
+green   = "#9ece6a"
+yellow  = "#e0af68"
+blue    = "#7aa2f7"
+magenta = "#bb9af7"
+cyan    = "#7dcfff"
+white   = "#cccccc"
+
+[colors.bright]
+black   = "#4e4e4e"
+red     = "#ff899d"
+green   = "#9fe044"
+yellow  = "#faba4a"
+blue    = "#8db0ff"
+magenta = "#c7a9ff"
+cyan    = "#a4daff"
+white   = "#f8f8f8"

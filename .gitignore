@@ -1,0 +1,7 @@
+# OS / editor cruft
+*.swp
+*~
+.DS_Store
+
+# stow leaves these when adopting; ignore accidental backups
+*.bak

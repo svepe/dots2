@@ -6,6 +6,25 @@ import = [
   "~/.config/alacritty/colors.toml",
 ]
 
+# MonoLisaCode (installed by scripts/30-fonts.sh); size left at alacritty's
+# default. Nerd Font icon glyphs come from the fontconfig fallback (Symbols Nerd
+# Font Mono), so they aren't listed here explicitly.
+[font.normal]
+family = "MonoLisaCode"
+style = "Regular"
+
+[font.bold]
+family = "MonoLisaCode"
+style = "Bold"
+
+[font.italic]
+family = "MonoLisaCode"
+style = "Italic"
+
+[font.bold_italic]
+family = "MonoLisaCode"
+style = "Bold Italic"
+
 [[keyboard.bindings]]
 key = "Return"
 mods = "Shift"

@@ -4,7 +4,9 @@
 # Safe to re-run: stow --restow re-links, installers should be idempotent.
 #
 # Run directly once the repo is cloned:
-#   ./install.sh
+#   ./install.sh                 # prompts before fetching private assets
+#   ./install.sh --no-private    # skip private assets (e.g. licensed fonts)
+#   ./install.sh --private       # fetch private assets without prompting
 #
 set -euo pipefail
 
@@ -14,11 +16,23 @@ cd "$DOTS_DIR"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m!!\033[0m %s\n' "$*" >&2; }
 
+# --- flags ------------------------------------------------------------------
+# Skip the interactive private-assets prompt (see scripts/20-private.sh) by
+# exporting DOTS_PRIVATE for the imperative installers.
+for arg in "$@"; do
+  case "$arg" in
+    --private)    export DOTS_PRIVATE=1 ;;
+    --no-private) export DOTS_PRIVATE=0 ;;
+    *) err "unknown flag: $arg"; exit 1 ;;
+  esac
+done
+
 # --- stow packages ----------------------------------------------------------
 # One directory per app, laid out mirroring $HOME. `stow <pkg>` symlinks its
 # contents into $HOME. Add packages here as each task lands.
 STOW_PACKAGES=(
   alacritty
+  fontconfig
   kwin
   # bash
   # git

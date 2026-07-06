@@ -19,12 +19,12 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 2 | Color theme (carry over from old config) | ✅ done |
 | 3 | Bash shell config | ☐ todo |
 | 4 | Git config | ☐ todo |
-| 5 | Fonts (incl. MonoLisa) | ☐ todo |
+| 5 | Fonts (incl. MonoLisa) | ✅ done |
 | 6 | Terminal emulator config (alacritty/ghostty) | ☐ todo |
 | 7 | Tmux + prompt (starship?) | ☐ todo |
 | 8 | Neovim config from scratch | ☐ todo |
 | 9 | Atuin (shell history) | ☐ todo |
-| 10 | Keyboard shortcuts (KDE global) | 🔨 wip |
+| 10 | Keyboard shortcuts (KDE global) | ✅ done |
 | 11 | Desktop environment appearance (KDE/Plasma) | 🔨 wip |
 
 ## Tasks
@@ -63,7 +63,10 @@ _Decisions:_ TBD
 ### 5. Fonts (incl. MonoLisa)
 Install and configure fonts: MonoLisa for coding, plus a Nerd Font for icons/powerline glyphs. Reference old dots `install_fonts.sh` + `fonts.conf`.
 
-_Decisions:_ TBD
+_Decisions:_
+- **`scripts/30-fonts.sh`** installs every font under `fonts/` (public) and `private/fonts/` (out-of-band) into `~/.local/share/fonts`, and sets the KDE monospace font when MonoLisaCode is present.
+- **MonoLisa** lives in `private/`, fetched by **`scripts/20-private.sh`** from a private repo (prompted, or non-interactive via `DOTS_PRIVATE=1/0` / `install.sh --private|--no-private`); never committed here.
+- **Nerd Font** icons come from **Symbols Nerd Font Mono** via a weak fontconfig fallback (`fontconfig` stow package), so MonoLisaCode renders glyphs without patching.
 
 ### 6. Terminal emulator config (alacritty/ghostty)
 Configure the primary terminal (alacritty and/or ghostty, both installed). Applies color theme, font, and keybindings. Decide which terminal is primary.
@@ -141,6 +144,7 @@ _Decisions:_
 - **KWin scripts** live in the **`kwin`** stow package (`kwin/.local/share/kwin/scripts/<id>/`, static files → safe to symlink) and are enabled by **`scripts/55-kwin-scripts.sh`** (`kwriteconfig6` sets `[Plugins] <id>Enabled=true` in `kwinrc`). A newly-enabled script only loads on next login (or a manual `loadScript` over the `/Scripting` D-Bus).
 - **`borderless-tiled`** — removes window decorations while a window is quick-tiled / maximized / fullscreen, restores them when floating. Plasma 6.6 gotcha: there's no scriptable `quickTileMode` property (only the signal), so tiling is detected via the window's `tile` (non-null leaf tile); maximize via `maximizeMode === 3`. Floating windows report `tile === null`.
 - **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/50-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
+- **Appearance / effects** live in **`scripts/60-kde-appearance.sh`** (kwinrc via `kwriteconfig6`), kept separate from the script-enabler above. So far: **Translucency** — inactive windows at 90% opacity (`[Effect-translucency] Inactive=90`).
 
 ## Reference
 

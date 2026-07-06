@@ -5,3 +5,6 @@
 
 # stow leaves these when adopting; ignore accidental backups
 *.bak
+
+# supplied out-of-band (private repo, cloned by scripts/20-private.sh)
+private/

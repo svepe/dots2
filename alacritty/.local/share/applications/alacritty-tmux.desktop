@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Alacritty (tmux)
+Comment=Alacritty attached to tmux
+Exec=alacritty -e tmux
+Icon=Alacritty
+Terminal=false
+Categories=System;TerminalEmulator;
+StartupWMClass=Alacritty
+Keywords=terminal;tmux;

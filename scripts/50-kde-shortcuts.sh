@@ -108,7 +108,12 @@ done
 # Under [services][<desktop-id>.desktop], _launch MUST be a BARE key sequence,
 # exactly as System Settings writes it. The 3-field "key,default,friendly" form
 # shows in the UI but the grab is never installed — this was the original bug.
-kwriteconfig6 --file "$FILE" --group services --group "Alacritty.desktop" --key "_launch" "Meta+T"
-kwriteconfig6 --file "$FILE" --group services --group "firefox.desktop"   --key "_launch" "Meta+W"
+#   Meta+T       -> alacritty running tmux (alacritty-tmux.desktop, stowed)
+#   Ctrl+Alt+T   -> plain alacritty (freed from Konsole's default launcher)
+kwriteconfig6 --file "$FILE" --group services --group "alacritty-tmux.desktop" --key "_launch" "Meta+T"
+kwriteconfig6 --file "$FILE" --group services --group "Alacritty.desktop"      --key "_launch" "Ctrl+Alt+T"
+kwriteconfig6 --file "$FILE" --group services --group "firefox.desktop"        --key "_launch" "Meta+W"
+# Free Ctrl+Alt+T from Konsole's built-in launcher default.
+kwriteconfig6 --file "$FILE" --group services --group "org.kde.konsole.desktop" --key "_launch" "none"
 
 log "wrote shortcuts to $SRC — take effect at next login"

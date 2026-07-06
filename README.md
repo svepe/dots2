@@ -20,8 +20,8 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 3 | Bash shell config | ☐ todo |
 | 4 | Git config | ☐ todo |
 | 5 | Fonts (incl. MonoLisa) | ✅ done |
-| 6 | Terminal emulator config (alacritty/ghostty) | ☐ todo |
-| 7 | Tmux + prompt (starship?) | ☐ todo |
+| 6 | Terminal emulator config (alacritty/ghostty) | ✅ done |
+| 7 | Tmux + prompt (starship) | ✅ done |
 | 8 | Neovim config from scratch | ☐ todo |
 | 9 | Atuin (shell history) | ☐ todo |
 | 10 | Keyboard shortcuts (KDE global) | ✅ done |
@@ -64,19 +64,27 @@ _Decisions:_ TBD
 Install and configure fonts: MonoLisa for coding, plus a Nerd Font for icons/powerline glyphs. Reference old dots `install_fonts.sh` + `fonts.conf`.
 
 _Decisions:_
-- **`scripts/30-fonts.sh`** installs every font under `fonts/` (public) and `private/fonts/` (out-of-band) into `~/.local/share/fonts`, and sets the KDE monospace font when MonoLisaCode is present.
-- **MonoLisa** lives in `private/`, fetched by **`scripts/20-private.sh`** from a private repo (prompted, or non-interactive via `DOTS_PRIVATE=1/0` / `install.sh --private|--no-private`); never committed here.
-- **Nerd Font** icons come from **Symbols Nerd Font Mono** via a weak fontconfig fallback (`fontconfig` stow package), so MonoLisaCode renders glyphs without patching.
+- **MonoLisa is patched with Nerd Font glyphs** rather than paired with a fallback font. A fallback (e.g. Symbols Nerd Font Mono) renders the extra glyphs at *text* height — the rounded/pixel powerline separators come out too small — whereas a patched font draws them at full cell height. Only MonoLisa's built-in arrow separators (`E0B0`–`E0B3`) were full-size before patching.
+- MonoLisa is licensed, so the originals and the patched output live in **`private/`** (fetched by **`scripts/20-private.sh`** from a private repo; never committed here).
+- **Patch workflow:** drop static MonoLisaCode weights (Regular/Bold/Italic/BoldItalic) in `private/monolisa-src/`, patch with [`daylinmorgan/monolisa-nerdfont-patch`](https://github.com/daylinmorgan/monolisa-nerdfont-patch) (needs `fontforge`; `make patch`), output to `private/fonts/patched/`. Resulting family: **MonoLisaCode Nerd Font**.
+- **`scripts/30-fonts.sh`** installs `private/fonts/patched/*` into `~/.local/share/fonts` and sets the KDE monospace font (`kdeglobals fixed`) to the patched family when present. alacritty (#6) points at the same family.
 
 ### 6. Terminal emulator config (alacritty/ghostty)
 Configure the primary terminal (alacritty and/or ghostty, both installed). Applies color theme, font, and keybindings. Decide which terminal is primary.
 
-_Decisions:_ TBD
+_Decisions:_
+- **Alacritty** is primary. Stow package `alacritty/.config/alacritty/`; colors from the generated `colors.toml` (see #2), font **MonoLisaCode Nerd Font** (see #5) at alacritty's default size. No fallback font needed — the patched font is self-contained.
 
-### 7. Tmux + prompt (starship?)
+### 7. Tmux + prompt (starship)
 Set up tmux (refresh `tmux.conf` from old dots). Research and decide on prompt: starship vs tmux-powerline vs other. Old config used starship + tmux-powerline.
 
-_Decisions:_ TBD
+_Decisions:_
+- **tmux** — stow package `tmux` (XDG `~/.config/tmux/`): prefix `C-a`, vi mode + vi copy bindings. **`scripts/40-tmux.sh`** installs it via `apt` (not the old appimage) plus tpm, plugins, and the compiled `tmux-mem-cpu-load`.
+  - Plugins: tpm, sensible, yank, pain-control, vim-tmux-navigator, extrakto, tmux-mem-cpu-load, resurrect + continuum (periodic auto-save, **no** auto-restore on start).
+  - **Status bar is hand-rolled** and palette-themed (`tmux/generate-theme.sh` → `theme.conf`): `session │ windows │ cpu·mem · disk / · host` with powerline separators — replacing the slow, fork-per-segment tmux-powerline.
+- **starship** — stow package `starship`; **`scripts/35-starship.sh`** installs it to `~/.local/bin` and bash-preexec, and appends a guarded `.bashrc` block (stopgap until #3 owns `.bashrc`). Palette synced in place by `starship/generate-theme.sh` (its glyphs are preserved, only `color_*` lines are rewritten).
+  - Replaced the wall-clock `time` module with the **command start time** — a `bash-preexec` hook stamps `STARSHIP_CMD_START` at the moment a command runs. bash has no native preexec, which is exactly why this wasn't possible before.
+  - Added **`cmd_duration`** (with `show_milliseconds`) for how long the last command took.
 
 ### 8. Neovim config from scratch
 Build a fresh nvim config using **lazy.nvim** (not packer — unmaintained; old config already used lazy). `init.lua` + `lua/` modules. Reference old config but start clean. Apply shared color theme.
@@ -124,7 +132,7 @@ the original default still works too (added) or was replaced (its active binding
 | Edit Tiles (tiling editor) | `Meta+Alt+T` | `Meta+T` | ❌ replaced (freed for Alacritty) |
 | Overview | `Meta+Alt+W` | `Meta+W` | ❌ replaced (freed for Firefox) |
 
-Desktop actions use the 2×2 virtual-desktop grid (`kwinrc`: `Number=4`, `Rows=2`).
+Desktop actions use the 3×3 virtual-desktop grid, wrapping around (`kwinrc`: `Number=9`, `Rows=3`, `RollOverDesktops=true`).
 
 Window focus — from the `spatial-focus` KWin script (task 11); the `` ` `` variants come from keyd
 | Keys | Action |
@@ -144,7 +152,8 @@ _Decisions:_
 - **KWin scripts** live in the **`kwin`** stow package (`kwin/.local/share/kwin/scripts/<id>/`, static files → safe to symlink) and are enabled by **`scripts/55-kwin-scripts.sh`** (`kwriteconfig6` sets `[Plugins] <id>Enabled=true` in `kwinrc`). A newly-enabled script only loads on next login (or a manual `loadScript` over the `/Scripting` D-Bus).
 - **`borderless-tiled`** — removes window decorations while a window is quick-tiled / maximized / fullscreen, restores them when floating. Plasma 6.6 gotcha: there's no scriptable `quickTileMode` property (only the signal), so tiling is detected via the window's `tile` (non-null leaf tile); maximize via `maximizeMode === 3`. Floating windows report `tile === null`.
 - **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/50-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
-- **Appearance / effects** live in **`scripts/60-kde-appearance.sh`** (kwinrc via `kwriteconfig6`), kept separate from the script-enabler above. So far: **Translucency** — inactive windows at 90% opacity (`[Effect-translucency] Inactive=90`).
+- **Appearance / effects** in **`scripts/60-kde-appearance.sh`** (kwinrc via `kwriteconfig6`), separate from the script-enabler above: **Translucency** (inactive windows 90%, `[Effect-translucency] Inactive=90`); **virtual desktops** (3×3 grid, wrap-around, text-only switch OSD at 400ms).
+- **Dolphin** in **`scripts/65-dolphin.sh`** (dolphinrc): no remembered tabs, full-width status bar, hidden menu bar, places-icon size — skipping volatile/env-specific keys.
 
 ## Reference
 

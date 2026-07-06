@@ -18,6 +18,17 @@ kwriteconfig6 --file kwinrc --group Plugins --key "translucencyEnabled" "true"
 kwriteconfig6 --file kwinrc --group "Effect-translucency" --key "Inactive" "90"
 log "translucency: inactive windows at 90%"
 
+# --- virtual desktops --------------------------------------------------------
+# 3x3 grid, navigation wraps around, and the switch OSD is text-only with a
+# short (400ms) duration.
+kwriteconfig6 --file kwinrc --group Desktops --key "Number" "9"
+kwriteconfig6 --file kwinrc --group Desktops --key "Rows" "3"
+kwriteconfig6 --file kwinrc --group Windows --key "RollOverDesktops" "true"
+kwriteconfig6 --file kwinrc --group Plugins --key "desktopchangeosdEnabled" "true"
+kwriteconfig6 --file kwinrc --group "Script-desktopchangeosd" --key "TextOnly" "true"
+kwriteconfig6 --file kwinrc --group "Script-desktopchangeosd" --key "PopupHideDelay" "400"
+log "virtual desktops: 3x3, text-only OSD (400ms)"
+
 # KWin picks up effect config changes on reconfigure (no re-login needed).
 if command -v qdbus6 >/dev/null 2>&1; then
   qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1 || true

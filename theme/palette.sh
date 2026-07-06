@@ -13,6 +13,7 @@
 # exported, so they never leak into child processes or your interactive shell.
 
 # --- neutral surfaces (backgrounds) -----------------------------------------
+C_BLACK="#000000"       # pure black — max-contrast text on bright accents
 C_BG="#1c1c1c"          # main background
 C_BG_DARK="#121212"     # darker surface (window bg, inactive panes)
 C_BG_HIGHLIGHT="#3a3a3a" # selection / highlighted line

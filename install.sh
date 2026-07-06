@@ -32,12 +32,12 @@ done
 # contents into $HOME. Add packages here as each task lands.
 STOW_PACKAGES=(
   alacritty
-  fontconfig
   kwin
+  starship
+  tmux
   # bash
   # git
   # nvim
-  # tmux
 )
 
 if ! command -v stow >/dev/null 2>&1; then
@@ -62,7 +62,9 @@ for pkg in "${STOW_PACKAGES[@]}"; do
     continue
   fi
   log "stow $pkg"
-  stow --restow --target="$HOME" --ignore='generate-theme\.sh$' "$pkg"
+  # --no-folding: link individual files, never turn a whole ~/.config/<app> into
+  # a symlink into the repo (apps write runtime state there, e.g. tmux plugins).
+  stow --restow --no-folding --target="$HOME" --ignore='generate-theme\.sh$' "$pkg"
 done
 
 # --- imperative installers --------------------------------------------------

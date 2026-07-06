@@ -24,8 +24,8 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 7 | Tmux + prompt (starship?) | ☐ todo |
 | 8 | Neovim config from scratch | ☐ todo |
 | 9 | Atuin (shell history) | ☐ todo |
-| 10 | Keyboard shortcuts (KDE global) | ☐ todo |
-| 11 | Desktop environment appearance (KDE/Plasma) | ☐ todo |
+| 10 | Keyboard shortcuts (KDE global) | 🔨 wip |
+| 11 | Desktop environment appearance (KDE/Plasma) | 🔨 wip |
 
 ## Tasks
 
@@ -88,12 +88,59 @@ _Decisions:_ TBD
 ### 10. Keyboard shortcuts (KDE global)
 Version and configure KDE global keyboard shortcuts (`kglobalshortcutsrc`) and custom key bindings. Decide how to reproducibly apply them on a fresh machine.
 
-_Decisions:_ TBD
+_Decisions:_
+- Applied imperatively by **`scripts/50-kde-shortcuts.sh`** (via `kwriteconfig6`), not stowed — Plasma rewrites `kglobalshortcutsrc` in place.
+- **App-launch shortcuts are the tricky part:** under `[services][<desktop-id>.desktop]`, `_launch` **must** be a **bare** key sequence (e.g. `_launch=Meta+T`), byte-for-byte matching what System Settings writes. The 3-field `active,default,friendly` form shows in the UI but the grab is **never installed** — this was the original bug.
+- **When a launcher key collides with a built-in KWin action** (e.g. `Meta+T` = Edit Tiles), remap that action's **active** field (1st of the `active,default,friendly` triple) to a free key — `Edit Tiles=Meta+Alt+T,Meta+T,…` (keep KWin's default in the 2nd field). Disabling it instead (`none,Meta+T,…`) also works if you don't want the action at all.
+- Confirmed reproducible from a clean boot: `kwriteconfig6` alone installs the grabs at session start — no GUI/D-Bus step needed.
+- **Keyboard input** (input-level, not global shortcuts, but related):
+  - `scripts/45-kde-keyboard.sh` → XKB options in `kxkbrc`: `caps:escape`; layouts `us,bg` (Bulgarian phonetic) with `grp:alt_shift_toggle` so `Alt+Shift` cycles them; and `plasmarc [OSD] kbdLayoutChangedEnabled=false` to suppress the layout-change popup.
+  - `scripts/70-keyd.sh` → installs `system/keyd/default.conf` to `/etc/keyd/` (needs `sudo`; not stowed, `/etc` is root-owned). Provides what XKB can't on Wayland: dual-role **Caps** (tap Esc / hold Ctrl — supersedes the XKB `caps:escape` fallback) and a **grave nav layer** (hold `` ` `` then `hjkl` / `1..9` → the focus shortcuts, home-row ergonomic). keyd remaps at the evdev layer, so tap/hold works.
+  - `Meta+Alt+K/L` are freed for focus by disabling the (single-layout-useless) `Switch to Next/Last-Used Keyboard Layout` shortcuts in `kglobalshortcutsrc`.
+
+_Shortcuts:_
+
+Application launchers
+| Shortcut | Launches | Desktop id |
+|----------|----------|------------|
+| `Meta+T` | Alacritty | `Alacritty.desktop` |
+| `Meta+W` | Firefox | `firefox.desktop` |
+
+Window & desktop actions — my binding vs the KDE default. "Default kept?" = whether
+the original default still works too (added) or was replaced (its active binding removed).
+| Action | My shortcut | KDE default | Default kept? |
+|--------|-------------|-------------|:-------------:|
+| Quick Tile left | `Meta+H` | `Meta+Left` | ✅ added |
+| Quick Tile down | `Meta+J` | `Meta+Down` | ✅ added |
+| Quick Tile up | `Meta+K` | `Meta+Up` | ✅ added |
+| Quick Tile right | `Meta+L` | `Meta+Right` | ✅ added |
+| Maximize window | `Meta+Return` | `Meta+PgUp` | ✅ added |
+| Close window | `Alt+Q` | `Alt+F4` | ✅ added |
+| Switch desktop L/D/U/R | `Ctrl+Alt+H/J/K/L` or `Ctrl+Alt+<arrow>` | `Meta+Ctrl+<arrow>` | ❌ disabled |
+| Move window to desktop L/D/U/R | `Meta+Ctrl+Alt+H/J/K/L` or `Meta+Ctrl+Alt+<arrow>` | `Meta+Ctrl+Shift+<arrow>` | ❌ disabled |
+| Edit Tiles (tiling editor) | `Meta+Alt+T` | `Meta+T` | ❌ replaced (freed for Alacritty) |
+| Overview | `Meta+Alt+W` | `Meta+W` | ❌ replaced (freed for Firefox) |
+
+Desktop actions use the 2×2 virtual-desktop grid (`kwinrc`: `Number=4`, `Rows=2`).
+
+Window focus — from the `spatial-focus` KWin script (task 11); the `` ` `` variants come from keyd
+| Keys | Action |
+|------|--------|
+| `Alt+1..9` or hold `` ` ``+`1..9` | Focus the N-th window (left→right, x then y, across all monitors) |
+| `Meta+Alt+H/J/K/L` or hold `` ` ``+`hjkl` | Focus the nearest window left/down/up/right |
+
+Session
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+Alt+O` | Lock screen (replaced `Meta+L`, freed for Quick Tile right) |
 
 ### 11. Desktop environment appearance (KDE/Plasma)
 Capture and reproducibly apply KDE/Plasma appearance: theme, colors, kwin, kdeglobals, panels/applets, gtk theming. Tie into the shared color theme.
 
-_Decisions:_ TBD
+_Decisions:_
+- **KWin scripts** live in the **`kwin`** stow package (`kwin/.local/share/kwin/scripts/<id>/`, static files → safe to symlink) and are enabled by **`scripts/55-kwin-scripts.sh`** (`kwriteconfig6` sets `[Plugins] <id>Enabled=true` in `kwinrc`). A newly-enabled script only loads on next login (or a manual `loadScript` over the `/Scripting` D-Bus).
+- **`borderless-tiled`** — removes window decorations while a window is quick-tiled / maximized / fullscreen, restores them when floating. Plasma 6.6 gotcha: there's no scriptable `quickTileMode` property (only the signal), so tiling is detected via the window's `tile` (non-null leaf tile); maximize via `maximizeMode === 3`. Floating windows report `tile === null`.
+- **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/50-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
 
 ## Reference
 

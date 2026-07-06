@@ -19,6 +19,7 @@ err() { printf '\033[1;31m!!\033[0m %s\n' "$*" >&2; }
 # contents into $HOME. Add packages here as each task lands.
 STOW_PACKAGES=(
   alacritty
+  kwin
   # bash
   # git
   # nvim

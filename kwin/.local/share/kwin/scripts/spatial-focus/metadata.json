@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Id": "spatial-focus",
+        "Name": "Spatial Window Focus",
+        "Description": "Focus windows by number (Alt+1..9) or direction (Meta+Alt+H/J/K/L), ordered spatially across all monitors.",
+        "Version": "1.0",
+        "Authors": [{ "Name": "svepe" }],
+        "License": "MIT",
+        "EnabledByDefault": true
+    },
+    "KPackageStructure": "KWin/Script",
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

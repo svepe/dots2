@@ -1,0 +1,14 @@
+{
+    "KPlugin": {
+        "Id": "borderless-tiled",
+        "Name": "Borderless Tiled Windows",
+        "Description": "Hides window decorations while a window is quick-tiled or fullscreen.",
+        "Version": "1.0",
+        "Authors": [{ "Name": "svepe" }],
+        "License": "MIT",
+        "EnabledByDefault": true
+    },
+    "KPackageStructure": "KWin/Script",
+    "X-Plasma-API": "javascript",
+    "X-Plasma-MainScript": "code/main.js"
+}

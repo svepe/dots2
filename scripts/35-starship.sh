@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 #
-# Install starship (the shell prompt) and wire up bash: bash-preexec + a preexec
-# hook that records each command's *start* time (STARSHIP_CMD_START), which the
-# prompt shows in place of a wall-clock. starship.toml itself is stowed.
-#
-# The .bashrc block is a stopgap until task 3 (bash) manages .bashrc properly.
+# Install starship (the shell prompt) and bash-preexec. The shell wiring
+# (sourcing bash-preexec, the preexec start-time hook, and `starship init`)
+# lives in the bash fragment ~/.config/bash/dots.bash (see #3); starship.toml
+# is stowed.
 #
 set -euo pipefail
 
@@ -24,20 +23,6 @@ if [ ! -f "$BP" ]; then
   curl -fsSL -o "$BP" \
     https://raw.githubusercontent.com/rcaloras/bash-preexec/master/bash-preexec.sh
   log "installed bash-preexec"
-fi
-
-# --- .bashrc integration (guarded / idempotent) -----------------------------
-if ! grep -qF '>>> dots2 starship/prompt >>>' "$HOME/.bashrc" 2>/dev/null; then
-  cat >> "$HOME/.bashrc" <<'RC'
-
-# >>> dots2 starship/prompt >>>
-[ -f ~/.config/bash/bash-preexec.sh ] && source ~/.config/bash/bash-preexec.sh
-_dots_cmd_start() { export STARSHIP_CMD_START="$(date +%R)"; }
-preexec_functions+=(_dots_cmd_start)
-command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
-# <<< dots2 starship/prompt <<<
-RC
-  log "added starship+preexec block to ~/.bashrc"
 fi
 
 log "done — open a new shell (or 'exec bash') to load the prompt"

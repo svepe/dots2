@@ -17,7 +17,7 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 |---|------|--------|
 | 1 | Repo structure + bootstrap/install | ✅ done |
 | 2 | Color theme (carry over from old config) | ✅ done |
-| 3 | Bash shell config | ☐ todo |
+| 3 | Bash shell config | ✅ done |
 | 4 | Git config | ☐ todo |
 | 5 | Fonts (incl. MonoLisa) | ✅ done |
 | 6 | Terminal emulator config (alacritty/ghostty) | ✅ done |
@@ -53,7 +53,11 @@ _Decisions:_
 ### 3. Bash shell config
 Base shell setup: aliases, PATH, env vars, shell options, history. Separate from the prompt. Currently mostly stock Kubuntu `.bashrc` + a `.local/bin` PATH line.
 
-_Decisions:_ TBD
+_Decisions:_
+- Stock `~/.bashrc` is left intact; customizations live in a sourced fragment **`bash/.config/bash/dots.bash`** (stow package `bash`), wired in by **`scripts/10-bash.sh`** via a guarded source line.
+- **vi mode** (`set -o vi`); the prompt shows vi normal mode via starship's character (#7).
+- **History**: `HISTSIZE`/`HISTFILESIZE=1000000`, `HISTCONTROL=ignoreboth`, `histappend` + `cmdhist` + `checkwinsize`, and `PROMPT_COMMAND='history -a'` so each command is written to the history file immediately — history survives crashes / non-clean exits, not just clean logouts.
+- The starship + bash-preexec wiring (start-time preexec hook + `starship init`) lives here, moved out of #7's stopgap `.bashrc` block; `scripts/35-starship.sh` now only installs the binaries.
 
 ### 4. Git config
 Set up `~/.gitconfig`: user identity, aliases, sensible defaults, and a diff pager (e.g. delta). No global gitconfig exists currently.

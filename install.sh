@@ -32,10 +32,10 @@ done
 # contents into $HOME. Add packages here as each task lands.
 STOW_PACKAGES=(
   alacritty
+  bash
   kwin
   starship
   tmux
-  # bash
   # git
   # nvim
 )

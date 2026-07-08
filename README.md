@@ -37,6 +37,7 @@ _Decisions:_
 - `bootstrap.sh` — curl-able fresh-machine entry: installs deps (git, stow, curl), clones the repo, runs `install.sh`.
 - `install.sh` — stows the packages in `STOW_PACKAGES[]`, then runs every `scripts/*.sh` in order. Idempotent (`stow --restow`).
 - `scripts/` — imperative installers for what symlinks can't do (fonts, atuin, KDE import); `NN-` prefix controls order.
+- `system/` — root-owned config drop-ins, not stowed; each installed with `sudo` by its script (validated first): keyd (`system/keyd/`, `scripts/70-keyd.sh`) and sudoers (`system/sudoers.d/`, `scripts/75-sudoers.sh`).
 - Scripts use `apt-get`, not `apt` (apt's CLI isn't script-stable).
 - KDE/Plasma configs (#10, #11) will use export/import, not stow — Plasma rewrites those files in place and clobbers symlinks.
 

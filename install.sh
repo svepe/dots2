@@ -34,10 +34,10 @@ STOW_PACKAGES=(
   alacritty
   bash
   kwin
+  nvim
   starship
   tmux
   # git
-  # nvim
 )
 
 if ! command -v stow >/dev/null 2>&1; then

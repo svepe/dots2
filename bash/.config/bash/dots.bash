@@ -18,6 +18,14 @@ HISTCONTROL=ignoreboth
 shopt -s histappend cmdhist checkwinsize
 PROMPT_COMMAND='history -a'
 
+# --- node (nvm) --------------------------------------------------------------
+# nvm is installed by scripts/18-node.sh with rc-file editing disabled, so we
+# source it here. Provides node/npm, needed by nvim's mason-managed tools
+# (prettier, pyright, and the json/yaml language servers).
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
 # --- prompt (starship) + command timing --------------------------------------
 # bash-preexec (installed by scripts/35-starship.sh) gives us a preexec hook to
 # stamp the command *start* time that starship shows; it also preserves the

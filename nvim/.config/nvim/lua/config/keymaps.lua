@@ -7,6 +7,11 @@ vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>")
 -- save
 vim.keymap.set({ "n", "v" }, "<leader>fs", "<cmd>w<cr>", { desc = "Save file" })
 
+-- format (conform, falls back to LSP)
+vim.keymap.set({ "n", "v" }, "<leader>mf", function()
+  require("conform").format({ async = true, lsp_format = "fallback" })
+end, { desc = "Format file" })
+
 -- file tree
 vim.keymap.set("n", "<leader>ft", "<cmd>Neotree filesystem reveal left<cr>", { desc = "File tree" })
 

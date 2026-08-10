@@ -108,6 +108,17 @@ vim.keymap.set("n", "<leader>np", function()
   require("todo-comments").jump_prev()
 end, { desc = "Previous todo" })
 
+-- git (<leader>g): neogit for status/staging/commit; gitsigns for hunk nav.
+vim.keymap.set({ "n", "v" }, "<leader>gs", function()
+  require("neogit").open({ kind = "vsplit" })
+end, { desc = "Status (neogit)" })
+vim.keymap.set("n", "<leader>gn", function()
+  require("gitsigns").nav_hunk("next")
+end, { desc = "Next hunk" })
+vim.keymap.set("n", "<leader>gp", function()
+  require("gitsigns").nav_hunk("prev")
+end, { desc = "Previous hunk" })
+
 -- quickfix (<leader>q): populate the list from any telescope picker with <C-q>,
 -- then step through entries here. qn/qp wrap at the ends.
 local function qf_step(step, wrap)

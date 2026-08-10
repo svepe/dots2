@@ -19,9 +19,10 @@ require("mason-lspconfig").setup({
   automatic_enable = false, -- we enable everything explicitly below
 })
 
--- Non-LSP tools (conform formatters) that mason should keep installed.
+-- Non-LSP tools mason should keep installed: conform formatters plus the
+-- tree-sitter CLI (required by nvim-treesitter's main branch to build parsers).
 require("mason-tool-installer").setup({
-  ensure_installed = { "stylua", "prettier" },
+  ensure_installed = { "stylua", "prettier", "tree-sitter-cli" },
 })
 
 require("lazydev").setup()
@@ -62,14 +63,30 @@ vim.api.nvim_create_autocmd("LspAttach", {
     local map = function(keys, fn, desc, modes)
       vim.keymap.set(modes or "n", keys, fn, { buffer = buf, desc = desc })
     end
-    map("<leader>md", vim.lsp.buf.definition, "Definition")
+    -- telescope.builtin picker by name (lazy-required — loads before this fires)
+    local tb = function(name)
+      return function()
+        require("telescope.builtin")[name]()
+      end
+    end
+    -- navigation (telescope pickers)
+    map("<leader>md", tb("lsp_definitions"), "Definition")
     map("<leader>mD", vim.lsp.buf.declaration, "Declaration")
-    map("<leader>mT", vim.lsp.buf.type_definition, "Type definition")
-    map("<leader>mr", vim.lsp.buf.references, "References")
+    map("<leader>mI", tb("lsp_implementations"), "Implementations")
+    map("<leader>mT", tb("lsp_type_definitions"), "Type definition")
+    map("<leader>mr", tb("lsp_references"), "References")
+    map("<leader>ms", tb("lsp_document_symbols"), "Document symbols")
+    map("<leader>ml", tb("diagnostics"), "List diagnostics")
+    -- actions
     map("<leader>mR", vim.lsp.buf.rename, "Rename")
-    map("<leader>ms", vim.lsp.buf.signature_help, "Signature help")
     map("<leader>ma", vim.lsp.buf.code_action, "Code action", { "n", "v" })
+    map("<leader>mk", vim.lsp.buf.signature_help, "Signature help")
+    -- workspace
+    map("<leader>mws", tb("lsp_dynamic_workspace_symbols"), "Workspace symbols")
     map("<leader>mwa", vim.lsp.buf.add_workspace_folder, "Add workspace folder")
     map("<leader>mwr", vim.lsp.buf.remove_workspace_folder, "Remove workspace folder")
+    map("<leader>mwl", function()
+      print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
+    end, "List workspace folders")
   end,
 })

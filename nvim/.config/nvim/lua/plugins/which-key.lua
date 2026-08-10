@@ -7,7 +7,11 @@ local wk = require("which-key")
 wk.setup({})
 wk.add({
   { "<leader>f", group = "file" },
+  { "<leader>b", group = "buffer" },
+  { "<leader>n", group = "notes" },
+  { "<leader>q", group = "quickfix" },
   { "<leader>w", group = "window" },
   { "<leader>m", group = "code" },
+  { "<leader>mt", group = "trouble" },
   { "<leader>mw", group = "workspace" },
 })

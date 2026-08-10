@@ -5,6 +5,11 @@
 -- clear search highlight
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>")
 
+-- flash: jump anywhere with `s` (replaces native substitute; use cl for that)
+vim.keymap.set({ "n", "x", "o" }, "s", function()
+  require("flash").jump()
+end, { desc = "Flash jump" })
+
 -- save
 vim.keymap.set({ "n", "v" }, "<leader>fs", "<cmd>w<cr>", { desc = "Save file" })
 

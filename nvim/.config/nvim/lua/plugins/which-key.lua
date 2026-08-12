@@ -8,6 +8,7 @@ wk.setup({})
 wk.add({
   { "<leader>f", group = "file" },
   { "<leader>b", group = "buffer" },
+  { "<leader>c", group = "cursors" },
   { "<leader>g", group = "git" },
   { "<leader>n", group = "notes" },
   { "<leader>q", group = "quickfix" },

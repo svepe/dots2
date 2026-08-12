@@ -5,10 +5,51 @@
 -- clear search highlight
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<cr>")
 
+-- markdown preview: buffer-local in markdown files (its command is buffer-local
+-- too). which-key auto-shows it under <leader>m when editing markdown.
+vim.api.nvim_create_autocmd("FileType", {
+  pattern = "markdown",
+  callback = function(ev)
+    vim.keymap.set("n", "<leader>mp", "<cmd>MarkdownPreviewToggle<cr>", {
+      buffer = ev.buf,
+      desc = "Markdown preview",
+    })
+  end,
+})
+
 -- flash: jump anywhere with `s` (replaces native substitute; use cl for that)
 vim.keymap.set({ "n", "x", "o" }, "s", function()
   require("flash").jump()
 end, { desc = "Flash jump" })
+
+-- multiple cursors (multicursor.nvim), Alt-based so no native Vim key is
+-- overridden; Alt+D echoes Sublime's Cmd+D. In-cursor-mode layer lives in
+-- plugins/multicursor.lua. Verified free of keyd/KDE/tmux/alacritty grabs.
+local function mc(method, arg)
+  return function()
+    local m = require("multicursor-nvim")
+    if arg == nil then
+      m[method]()
+    else
+      m[method](arg)
+    end
+  end
+end
+vim.keymap.set({ "n", "x" }, "<M-d>", mc("matchAddCursor", 1), { desc = "Cursor: add next match" })
+vim.keymap.set({ "n", "x" }, "<M-p>", mc("matchAddCursor", -1), { desc = "Cursor: add previous match" })
+vim.keymap.set({ "n", "x" }, "<M-x>", mc("matchSkipCursor", 1), { desc = "Cursor: skip match" })
+vim.keymap.set({ "n", "x" }, "<M-j>", mc("lineAddCursor", 1), { desc = "Cursor: add below" })
+vim.keymap.set({ "n", "x" }, "<M-k>", mc("lineAddCursor", -1), { desc = "Cursor: add above" })
+vim.keymap.set({ "n", "x" }, "<M-a>", mc("matchAllAddCursors"), { desc = "Cursor: add all matches" })
+
+-- discoverable <leader>c mirror (which-key shows these with their M- chord); the
+-- Alt chords above stay for fast use.
+vim.keymap.set({ "n", "x" }, "<leader>cd", mc("matchAddCursor", 1), { desc = "Add next match (M-d)" })
+vim.keymap.set({ "n", "x" }, "<leader>cp", mc("matchAddCursor", -1), { desc = "Add previous match (M-p)" })
+vim.keymap.set({ "n", "x" }, "<leader>cx", mc("matchSkipCursor", 1), { desc = "Skip match (M-x)" })
+vim.keymap.set({ "n", "x" }, "<leader>cj", mc("lineAddCursor", 1), { desc = "Add below (M-j)" })
+vim.keymap.set({ "n", "x" }, "<leader>ck", mc("lineAddCursor", -1), { desc = "Add above (M-k)" })
+vim.keymap.set({ "n", "x" }, "<leader>ca", mc("matchAllAddCursors"), { desc = "Add all matches (M-a)" })
 
 -- save
 vim.keymap.set({ "n", "v" }, "<leader>fs", "<cmd>w<cr>", { desc = "Save file" })

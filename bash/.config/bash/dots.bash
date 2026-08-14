@@ -18,6 +18,11 @@ HISTCONTROL=ignoreboth
 shopt -s histappend cmdhist checkwinsize
 PROMPT_COMMAND='history -a'
 
+# --- PATH --------------------------------------------------------------------
+# User-installed toolchain binaries (installers run with --no-modify-path, so we
+# add their dirs here): ~/.local/bin (uv, ruff), ~/.cargo/bin (rustup toolchain).
+export PATH="$PATH:$HOME/.local/bin:$HOME/.cargo/bin"
+
 # --- node (nvm) --------------------------------------------------------------
 # nvm is installed by scripts/18-node.sh with rc-file editing disabled, so we
 # source it here. Provides node/npm, needed by nvim's mason-managed tools

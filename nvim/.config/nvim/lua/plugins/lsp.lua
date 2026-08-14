@@ -15,8 +15,21 @@ require("mason").setup()
 -- Servers mason should install. System/toolchain servers (clangd, rust_analyzer,
 -- ruff) are intentionally absent — they live on PATH and we manage them.
 require("mason-lspconfig").setup({
-  ensure_installed = { "pyright", "lua_ls", "jsonls", "yamlls" },
+  -- basedpyright = pyright fork that also bundles docstrings for stdlib builtins
+  -- (so hover shows prose, not just the signature).
+  ensure_installed = { "basedpyright", "lua_ls", "jsonls", "yamlls" },
   automatic_enable = false, -- we enable everything explicitly below
+})
+
+-- basedpyright defaults to its stricter "recommended" diagnostics; pin to
+-- "standard" (pyright's default) so we get docstrings without a flood of
+-- extra warnings.
+vim.lsp.config("basedpyright", {
+  settings = {
+    basedpyright = {
+      analysis = { typeCheckingMode = "standard" },
+    },
+  },
 })
 
 -- Non-LSP tools mason should keep installed: conform formatters plus the
@@ -35,8 +48,18 @@ vim.diagnostic.config({
   signs = true,
 })
 
+-- Let Esc (not just q) close LSP hover/signature floats. Wrapping the single
+-- function that builds them keeps this scoped to LSP previews — no editor-wide
+-- float handling to babysit.
+local open_floating_preview = vim.lsp.util.open_floating_preview
+function vim.lsp.util.open_floating_preview(contents, syntax, opts, ...)
+  local bufnr, winid = open_floating_preview(contents, syntax, opts, ...)
+  vim.keymap.set("n", "<Esc>", "<C-w>c", { buffer = bufnr, nowait = true })
+  return bufnr, winid
+end
+
 -- Enable all servers: mason-managed + system/toolchain (on PATH).
-vim.lsp.enable({ "clangd", "rust_analyzer", "ruff", "pyright", "lua_ls", "jsonls", "yamlls" })
+vim.lsp.enable({ "clangd", "rust_analyzer", "ruff", "basedpyright", "lua_ls", "jsonls", "yamlls" })
 
 -- Diagnostics keymaps (global — no server needed), <leader>m scheme.
 vim.keymap.set("n", "<leader>me", vim.diagnostic.open_float, { desc = "Explain error (float)" })

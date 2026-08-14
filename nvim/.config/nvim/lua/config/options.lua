@@ -34,6 +34,7 @@ o.cursorline = true     -- highlight the current line
 o.scrolloff = 10        -- keep 10 lines above/below the cursor
 o.list = true           -- render whitespace...
 o.listchars = { tab = "» ", trail = "·", nbsp = "␣" } -- ...as these glyphs
+o.winborder = "rounded" -- rounded border on floats (hover, signature, docs)
 
 -- behaviour
 o.updatetime = 250      -- faster CursorHold / swap writes (ms)

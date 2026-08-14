@@ -85,12 +85,12 @@ format = '([$all_status$ahead_behind ]($style))'
 [env_var.STARSHIP_CMD_START]
 variable = "STARSHIP_CMD_START"
 style = "fg:color_purple bg:color_bg1"
-format = '[  $env_value ]($style)'
+format = '[   $env_value ]($style)'
 
 [cmd_duration]
 min_time = 0
 show_milliseconds = true
-style = "fg:color_orange bg:color_bg1"
+style = "fg:color_purple bg:color_bg1"
 format = '[ ($duration) ]($style)'
 
 [line_break]

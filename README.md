@@ -18,11 +18,11 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 1 | Repo structure + bootstrap/install | ✅ done |
 | 2 | Color theme (carry over from old config) | ✅ done |
 | 3 | Bash shell config | ✅ done |
-| 4 | Git config | ☐ todo |
+| 4 | Git config | 🚫 won't do |
 | 5 | Fonts (incl. MonoLisa) | ✅ done |
 | 6 | Terminal emulator config (alacritty/ghostty) | ✅ done |
 | 7 | Tmux + prompt (starship) | ✅ done |
-| 8 | Neovim config from scratch | ☐ todo |
+| 8 | Neovim config from scratch | ✅ done |
 | 9 | Atuin (shell history) | ☐ todo |
 | 10 | Keyboard shortcuts (KDE global) | ✅ done |
 | 11 | Desktop environment appearance (KDE/Plasma) | 🔨 wip |
@@ -61,9 +61,8 @@ _Decisions:_
 - The starship + bash-preexec wiring (start-time preexec hook + `starship init`) lives here, moved out of #7's stopgap `.bashrc` block; `scripts/35-starship.sh` now only installs the binaries.
 
 ### 4. Git config
-Set up `~/.gitconfig`: user identity, aliases, sensible defaults, and a diff pager (e.g. delta). No global gitconfig exists currently.
-
-_Decisions:_ TBD
+Won't do — git identity/config is managed outside the dotfiles (multiple
+accounts, set per-machine/per-repo).
 
 ### 5. Fonts (incl. MonoLisa)
 Install and configure fonts: MonoLisa for coding, plus a Nerd Font for icons/powerline glyphs. Reference old dots `install_fonts.sh` + `fonts.conf`.

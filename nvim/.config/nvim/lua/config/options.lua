@@ -40,3 +40,11 @@ o.winborder = "rounded" -- rounded border on floats (hover, signature, docs)
 o.updatetime = 250      -- faster CursorHold / swap writes (ms)
 o.timeoutlen = 300      -- mapping-sequence timeout (ms)
 o.confirm = true        -- prompt to save rather than failing :q
+
+-- briefly highlight yanked text
+vim.api.nvim_create_autocmd("TextYankPost", {
+  group = vim.api.nvim_create_augroup("dots-yank-highlight", { clear = true }),
+  callback = function()
+    vim.hl.on_yank()
+  end,
+})

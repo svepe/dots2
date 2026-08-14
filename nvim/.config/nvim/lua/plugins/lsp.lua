@@ -111,5 +111,39 @@ vim.api.nvim_create_autocmd("LspAttach", {
     map("<leader>mwl", function()
       print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
     end, "List workspace folders")
+
+    -- inlay hints: inferred types/param names inline. On by default where the
+    -- server supports them; toggle per buffer with <leader>mh.
+    if client and client:supports_method("textDocument/inlayHint") then
+      vim.lsp.inlay_hint.enable(true, { bufnr = buf })
+      map("<leader>mh", function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = buf }), { bufnr = buf })
+      end, "Toggle inlay hints")
+    end
+
+    -- highlight other references of the symbol under the cursor (on CursorHold);
+    -- cleared when the cursor moves or the server detaches.
+    if client and client:supports_method("textDocument/documentHighlight") then
+      local group = vim.api.nvim_create_augroup("dots-lsp-references", { clear = false })
+      vim.api.nvim_create_autocmd({ "CursorHold", "CursorHoldI" }, {
+        buffer = buf,
+        group = group,
+        callback = vim.lsp.buf.document_highlight,
+      })
+      vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+        buffer = buf,
+        group = group,
+        callback = vim.lsp.buf.clear_references,
+      })
+    end
+  end,
+})
+
+-- Clear reference highlights and their autocmds when a server detaches.
+vim.api.nvim_create_autocmd("LspDetach", {
+  group = vim.api.nvim_create_augroup("dots-lsp-detach", { clear = true }),
+  callback = function(ev)
+    vim.lsp.buf.clear_references()
+    pcall(vim.api.nvim_clear_autocmds, { group = "dots-lsp-references", buffer = ev.buf })
   end,
 })

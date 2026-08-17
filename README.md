@@ -25,7 +25,7 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 8 | Neovim config from scratch | ✅ done |
 | 9 | Atuin (shell history) | ☐ todo |
 | 10 | Keyboard shortcuts (KDE global) | ✅ done |
-| 11 | Desktop environment appearance (KDE/Plasma) | 🔨 wip |
+| 11 | Desktop environment appearance (KDE/Plasma) | ✅ done |
 
 ## Tasks
 
@@ -156,8 +156,14 @@ _Decisions:_
 - **KWin scripts** live in the **`kwin`** stow package (`kwin/.local/share/kwin/scripts/<id>/`, static files → safe to symlink) and are enabled by **`scripts/55-kwin-scripts.sh`** (`kwriteconfig6` sets `[Plugins] <id>Enabled=true` in `kwinrc`). A newly-enabled script only loads on next login (or a manual `loadScript` over the `/Scripting` D-Bus).
 - **`borderless-tiled`** — removes window decorations while a window is quick-tiled / maximized / fullscreen, restores them when floating. Plasma 6.6 gotcha: there's no scriptable `quickTileMode` property (only the signal), so tiling is detected via the window's `tile` (non-null leaf tile); maximize via `maximizeMode === 3`. Floating windows report `tile === null`.
 - **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/50-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
-- **Appearance / effects** in **`scripts/60-kde-appearance.sh`** (kwinrc via `kwriteconfig6`), separate from the script-enabler above: **Translucency** (inactive windows 90%, `[Effect-translucency] Inactive=90`); **virtual desktops** (3×3 grid, wrap-around, text-only switch OSD at 400ms).
+- **Appearance / effects** in **`scripts/60-kde-appearance.sh`**: **Translucency** (inactive windows 90%, `[Effect-translucency] Inactive=90`); **virtual desktops** (5×3 grid, wrap-around, text-only switch OSD at 400ms); **cursor** (breeze_cursors size 24, kcminputrc + `plasma-apply-cursortheme`); **always-dark global theme** (`plasma-apply-lookandfeel org.kubuntudark.desktop`, no `--resetLayout` so the panel survives).
+- **Panel / desktop layout** in **`scripts/62-kde-panel.sh`** + **`kde/plasma-org.kde.plasma.desktop-appletsrc`**: the appletsrc tree (panels, widgets, sizes, opacity) can't be expressed via `kwriteconfig6`, so it's snapshotted and copied into place on install — **not stowed** (plasmashell rewrites it at runtime) and machine/screen-specific.
 - **Dolphin** in **`scripts/65-dolphin.sh`** (dolphinrc): no remembered tabs, full-width status bar, hidden menu bar, places-icon size — skipping volatile/env-specific keys.
+
+**Updating after GUI changes.** KDE writes settings into `~/.config/*rc` as you change them in System Settings. To re-capture into the dots:
+- **Simple settings** (kwinrc, kcminputrc, kdeglobals, dolphinrc): read the changed key with `kreadconfig6 --file <file> --group <group> --key <key>` (or diff the file), then add/update the matching `kwriteconfig6` line in the relevant `scripts/*-kde-*.sh` / `65-dolphin.sh`.
+- **Global theme / cursor**: update the `plasma-apply-lookandfeel` / `plasma-apply-cursortheme` call in `60-kde-appearance.sh`.
+- **Panel / desktop layout / widgets**: re-snapshot the whole file — `cp ~/.config/plasma-org.kde.plasma.desktop-appletsrc kde/` — then commit.
 
 ## Reference
 

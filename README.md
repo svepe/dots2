@@ -23,7 +23,7 @@ Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
 | 6 | Terminal emulator config (alacritty/ghostty) | ✅ done |
 | 7 | Tmux + prompt (starship) | ✅ done |
 | 8 | Neovim config from scratch | ✅ done |
-| 9 | Atuin (shell history) | ☐ todo |
+| 9 | Atuin (shell history) | ✅ done |
 | 10 | Keyboard shortcuts (KDE global) | ✅ done |
 | 11 | Desktop environment appearance (KDE/Plasma) | ✅ done |
 
@@ -96,9 +96,21 @@ Build a fresh nvim config using **lazy.nvim** (not packer — unmaintained; old 
 _Decisions:_ TBD
 
 ### 9. Atuin (shell history)
-Install and configure atuin for shell history (search, sync). Integrate with bash. Consider companion CLI tools (fzf, zoxide, ripgrep, fd, bat, eza) here or separately.
+Fuzzy history search on `Ctrl+R`, backed by a local SQLite DB.
 
-_Decisions:_ TBD
+_Decisions:_
+- **Install** in **`scripts/21-atuin.sh`** — atuin's cargo-dist installer with
+  `*_NO_MODIFY_PATH` (binary to `~/.local/bin`, already on PATH via `dots.bash`);
+  seeds the DB from existing shell history on first run only.
+- **Config** is the **`atuin`** stow package (`~/.config/atuin/config.toml`):
+  **no sync** (local DB only); **compact** inline UI with no chrome
+  (`show_help`/`show_tabs`/`show_preview` off); **vim-insert** keymap (type to
+  search, `Esc` for vim navigation); `enter_accept` (Enter runs, Tab pastes);
+  global fuzzy search; secrets filtered. The **Alt+0-9** quick-select is
+  `noop`ed out in both vim keymaps.
+- **Shell integration** in `dots.bash`: `atuin init bash --disable-up-arrow` —
+  up-arrow stays native shell history; atuin is `Ctrl+R` only. Needs
+  bash-preexec (already loaded for starship).
 
 ### 10. Keyboard shortcuts (KDE global)
 Version and configure KDE global keyboard shortcuts (`kglobalshortcutsrc`) and custom key bindings. Decide how to reproducibly apply them on a fresh machine.

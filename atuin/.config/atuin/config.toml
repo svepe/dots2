@@ -1,0 +1,49 @@
+# atuin — shell history. Local DB only (no sync/account).
+# https://docs.atuin.sh/configuration/config/
+
+auto_sync = false     # local-only; no account/server
+update_check = false  # updated via the installer, no startup nag
+
+search_mode = "fuzzy" # fuzzy match the query
+filter_mode = "global" # Ctrl+R searches all history by default
+
+# Compact inline search with no chrome — minimal, distraction-free.
+style = "compact"
+inline_height = 20
+show_preview = false
+show_help = false
+show_tabs = false
+
+# Enter runs the selected command; Tab pastes it to the prompt to edit.
+enter_accept = true
+
+# Vim keymap, starting in insert mode (type to search; Esc -> vim-normal).
+keymap_mode = "vim-insert"
+
+# Never record obvious secrets/tokens.
+secrets_filter = true
+
+# Remove the unused Alt+0-9 numbered quick-select (noop in both vim modes).
+[keymap.vim-insert]
+"alt-0" = "noop"
+"alt-1" = "noop"
+"alt-2" = "noop"
+"alt-3" = "noop"
+"alt-4" = "noop"
+"alt-5" = "noop"
+"alt-6" = "noop"
+"alt-7" = "noop"
+"alt-8" = "noop"
+"alt-9" = "noop"
+
+[keymap.vim-normal]
+"alt-0" = "noop"
+"alt-1" = "noop"
+"alt-2" = "noop"
+"alt-3" = "noop"
+"alt-4" = "noop"
+"alt-5" = "noop"
+"alt-6" = "noop"
+"alt-7" = "noop"
+"alt-8" = "noop"
+"alt-9" = "noop"

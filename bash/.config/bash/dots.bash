@@ -20,8 +20,9 @@ PROMPT_COMMAND='history -a'
 
 # --- PATH --------------------------------------------------------------------
 # User-installed toolchain binaries (installers run with --no-modify-path, so we
-# add their dirs here): ~/.local/bin (uv, ruff), ~/.cargo/bin (rustup toolchain).
-export PATH="$PATH:$HOME/.local/bin:$HOME/.cargo/bin"
+# add their dirs here): ~/.local/bin (uv, ruff), ~/.cargo/bin (rustup toolchain),
+# ~/.atuin/bin (atuin).
+export PATH="$PATH:$HOME/.local/bin:$HOME/.cargo/bin:$HOME/.atuin/bin"
 
 # --- node (nvm) --------------------------------------------------------------
 # nvm is installed by scripts/18-node.sh with rc-file editing disabled, so we
@@ -41,3 +42,8 @@ if [ -f ~/.config/bash/bash-preexec.sh ]; then
   preexec_functions+=(_dots_cmd_start)
 fi
 command -v starship >/dev/null 2>&1 && eval "$(starship init bash)"
+
+# --- atuin (shell history) ---------------------------------------------------
+# Needs bash-preexec (sourced above). Up-arrow stays native; atuin is bound to
+# Ctrl+R only. Config in ~/.config/atuin/config.toml (stowed); local DB, no sync.
+command -v atuin >/dev/null 2>&1 && eval "$(atuin init bash --disable-up-arrow)"

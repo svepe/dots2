@@ -32,6 +32,7 @@ done
 # contents into $HOME. Add packages here as each task lands.
 STOW_PACKAGES=(
   alacritty
+  atuin
   bash
   kwin
   nvim

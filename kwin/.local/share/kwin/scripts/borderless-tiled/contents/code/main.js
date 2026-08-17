@@ -1,11 +1,22 @@
 // Borderless Tiled Windows
 //
 // Removes window decorations while a window is quick-tiled, maximized, or
-// fullscreen; restores them when it floats again.
+// fullscreen; restores them when it floats again. The terminal (alacritty) is
+// always kept borderless — even floating — since it's moved by snapping, not by
+// dragging a titlebar.
 //
 // KWin 6.6 has no scriptable `quickTileMode` property — quick-tiled windows are
 // placed in a leaf tile, so tiling is detected via `tile` (non-null, and not a
 // layout/root tile). `maximizeMode` is readable (0 = none, 3 = full).
+
+// Windows kept borderless in every state, matched by resourceClass (Wayland
+// app_id), case-insensitive.
+var ALWAYS_BORDERLESS = ["alacritty"];
+
+function isAlwaysBorderless(w) {
+    var c = (w.resourceClass || "").toString().toLowerCase();
+    return ALWAYS_BORDERLESS.indexOf(c) !== -1;
+}
 
 function isTiled(w) {
     var t = w.tile;
@@ -17,7 +28,7 @@ function applyBorder(w) {
     if (!w || !w.normalWindow || w.specialWindow) {
         return;
     }
-    var target = isTiled(w);
+    var target = isAlwaysBorderless(w) || isTiled(w);
     if (w.noBorder !== target) {
         w.noBorder = target;
     }

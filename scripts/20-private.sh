@@ -24,12 +24,15 @@ want_private() {
     1|y|yes|true)  return 0 ;;
     0|n|no|false)  return 1 ;;
   esac
-  if [ ! -t 0 ]; then
-    log "no terminal and DOTS_PRIVATE unset — skipping private assets"
+  if [ -t 1 ] && [ -r /dev/tty ]; then
+    # Read the controlling terminal, not stdin, so this prompts under
+    # `curl … | bash` too (stdin is the piped script there, not a TTY).
+    read -rp "Fetch private assets from $REPO? [y/N] " ans < /dev/tty || ans=""
+    [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
+  else
+    log "non-interactive and DOTS_PRIVATE unset — skipping private assets"
     return 1
   fi
-  read -rp "Fetch private assets from $REPO? [y/N] " ans
-  [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 if ! want_private; then

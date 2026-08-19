@@ -5,6 +5,8 @@
 #
 # Usage on a brand new system:
 #   curl -fsSL https://raw.githubusercontent.com/svepe/dots2/main/bootstrap.sh | bash
+# Flags are forwarded to install.sh, e.g. hands-free:
+#   curl -fsSL .../bootstrap.sh | bash -s -- --private -y
 #
 set -euo pipefail
 
@@ -38,4 +40,4 @@ fi
 
 # --- apply everything -------------------------------------------------------
 cd "$DOTS_DIR"
-exec ./install.sh
+exec ./install.sh "$@"

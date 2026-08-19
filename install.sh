@@ -88,8 +88,8 @@ log "done"
 # Several changes only fully apply after a restart: KDE global shortcuts
 # (kglobalacceld reloads kglobalshortcutsrc at login), keyd, the appearance/panel
 # session settings, and any freshly-installed kernel/driver bits. A reboot is the
-# clean way to pick them all up. -y accepts without asking; otherwise prompt when
-# interactive (default No) and skip silently when non-interactive.
+# clean way to pick them all up. -y accepts without asking; otherwise prompt on
+# the controlling terminal (default No), logging a note when there's none.
 # SIGKILL kglobalacceld right before rebooting so it can't save its stale
 # in-memory shortcuts over what 90-kde-shortcuts.sh just wrote (it may have
 # respawned while this prompt waited). Then reboot immediately — the fresh boot
@@ -101,11 +101,15 @@ do_reboot() {
 }
 if [ "$DOTS_YES" = "1" ]; then
   do_reboot
-elif [ -t 0 ] && [ -t 1 ]; then
-  read -rp "$(printf '\033[1;34m==>\033[0m Reboot now to apply all changes? [y/N] ')" ans
+elif [ -t 1 ] && [ -r /dev/tty ]; then
+  # Read the controlling terminal, not stdin, so this still prompts under
+  # `curl … | bash` (where stdin is the piped script, not a TTY).
+  read -rp "$(printf '\033[1;34m==>\033[0m Reboot now to apply all changes? [y/N] ')" ans < /dev/tty || ans=""
   if [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]; then
     do_reboot
   else
     log "skipped reboot — reboot (or at least log out/in) later to apply shortcuts/keyd/appearance"
   fi
+else
+  log "non-interactive — skipped reboot; reboot manually to apply shortcuts/keyd/appearance"
 fi

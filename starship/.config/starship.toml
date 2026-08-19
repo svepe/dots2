@@ -65,13 +65,14 @@ style = "fg:color_bg1 bg:color_green"
 format = "[ $path ]($style)"
 truncation_length = 3
 truncation_symbol = "…/"
+truncate_to_repo = false
 
 [directory.substitutions]
 "Documents" = "󰈙 "
 "Downloads" = " "
 "Music" = "󰝚 "
 "Pictures" = " "
-"Projects" = "󰲋 "
+"Projects" = "󰆧 "
 
 [git_branch]
 symbol = ""

@@ -116,4 +116,16 @@ kwriteconfig6 --file "$FILE" --group services --group "firefox.desktop"        -
 # Free Ctrl+Alt+T from Konsole's built-in launcher default.
 kwriteconfig6 --file "$FILE" --group services --group "org.kde.konsole.desktop" --key "_launch" "none"
 
-log "wrote shortcuts to $SRC — take effect at next login"
+# --- make the writes stick ---------------------------------------------------
+# kglobalacceld caches shortcuts in memory and rewrites this file with that copy
+# on *graceful* exit — so a normal logout, reboot, or `systemctl restart` saves
+# the stale in-memory defaults over what we just wrote, and a respawn (e.g. the
+# plasmashell restart in 62-kde-panel.sh) can clobber it too. That's why this
+# script runs LAST (90-, after the panel/appearance steps) and SIGKILLs the
+# daemon: with no chance to run its save-on-exit handler, our file stands.
+# install.sh then SIGKILLs it once more right before the reboot it prompts for,
+# so nothing respawns and re-clobbers in between; the bindings load cleanly on
+# the fresh boot (KWin re-registers its actions against a daemon that reads them).
+pkill -9 -x kglobalacceld 2>/dev/null || true
+
+log "wrote shortcuts to $SRC and reset kglobalacceld — apply after the reboot install.sh offers"

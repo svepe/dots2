@@ -9,7 +9,7 @@ Desktop-specific bits (KDE) are applied only where available.
 curl -fsSL https://raw.githubusercontent.com/svepe/dots2/main/bootstrap.sh | bash
 ```
 
-Installs deps, clones to `~/Projects/dots2`, runs `install.sh`. Safe to re-run.
+Installs deps, clones to `~/.dots2`, runs `install.sh`. Safe to re-run.
 
 ## Status
 
@@ -116,7 +116,7 @@ _Decisions:_
 Version and configure KDE global keyboard shortcuts (`kglobalshortcutsrc`) and custom key bindings. Decide how to reproducibly apply them on a fresh machine.
 
 _Decisions:_
-- Applied imperatively by **`scripts/50-kde-shortcuts.sh`** (via `kwriteconfig6`), not stowed — Plasma rewrites `kglobalshortcutsrc` in place.
+- Applied imperatively by **`scripts/90-kde-shortcuts.sh`** (via `kwriteconfig6`), not stowed — Plasma rewrites `kglobalshortcutsrc` in place.
 - **App-launch shortcuts are the tricky part:** under `[services][<desktop-id>.desktop]`, `_launch` **must** be a **bare** key sequence (e.g. `_launch=Meta+T`), byte-for-byte matching what System Settings writes. The 3-field `active,default,friendly` form shows in the UI but the grab is **never installed** — this was the original bug.
 - **When a launcher key collides with a built-in KWin action** (e.g. `Meta+T` = Edit Tiles), remap that action's **active** field (1st of the `active,default,friendly` triple) to a free key — `Edit Tiles=Meta+Alt+T,Meta+T,…` (keep KWin's default in the 2nd field). Disabling it instead (`none,Meta+T,…`) also works if you don't want the action at all.
 - Confirmed reproducible from a clean boot: `kwriteconfig6` alone installs the grabs at session start — no GUI/D-Bus step needed.
@@ -167,7 +167,7 @@ Capture and reproducibly apply KDE/Plasma appearance: theme, colors, kwin, kdegl
 _Decisions:_
 - **KWin scripts** live in the **`kwin`** stow package (`kwin/.local/share/kwin/scripts/<id>/`, static files → safe to symlink) and are enabled by **`scripts/55-kwin-scripts.sh`** (`kwriteconfig6` sets `[Plugins] <id>Enabled=true` in `kwinrc`). A newly-enabled script only loads on next login (or a manual `loadScript` over the `/Scripting` D-Bus).
 - **`borderless-tiled`** — removes window decorations while a window is quick-tiled / maximized / fullscreen, restores them when floating. Plasma 6.6 gotcha: there's no scriptable `quickTileMode` property (only the signal), so tiling is detected via the window's `tile` (non-null leaf tile); maximize via `maximizeMode === 3`. Floating windows report `tile === null`.
-- **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/50-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
+- **`spatial-focus`** — keyboard window focus: `Alt+1..9` jumps to the N-th window (spatial order, x then y, across all monitors); `Meta+Alt+H/J/K/L` focuses the nearest window in a direction. Gotcha: kglobalaccel **autoloads** a script shortcut's saved key from `kglobalshortcutsrc` and ignores the code default — so if a key is unavailable at first registration it's saved empty and stays broken. `scripts/90-kde-shortcuts.sh` therefore writes the `Focus Window *` keys explicitly to make them deterministic.
 - **Appearance / effects** in **`scripts/60-kde-appearance.sh`**: **Translucency** (inactive windows 90%, `[Effect-translucency] Inactive=90`); **virtual desktops** (5×3 grid, wrap-around, text-only switch OSD at 400ms); **cursor** (breeze_cursors size 24, kcminputrc + `plasma-apply-cursortheme`); **always-dark global theme** (`plasma-apply-lookandfeel org.kubuntudark.desktop`, no `--resetLayout` so the panel survives).
 - **Panel / desktop layout** in **`scripts/62-kde-panel.sh`** + **`kde/plasma-org.kde.plasma.desktop-appletsrc`**: the appletsrc tree (panels, widgets, sizes, opacity) can't be expressed via `kwriteconfig6`, so it's snapshotted and copied into place on install — **not stowed** (plasmashell rewrites it at runtime) and machine/screen-specific.
 - **Dolphin** in **`scripts/65-dolphin.sh`** (dolphinrc): no remembered tabs, full-width status bar, hidden menu bar, places-icon size — skipping volatile/env-specific keys.

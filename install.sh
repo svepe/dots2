@@ -7,6 +7,7 @@
 #   ./install.sh                 # prompts before fetching private assets
 #   ./install.sh --no-private    # skip private assets (e.g. licensed fonts)
 #   ./install.sh --private       # fetch private assets without prompting
+#   ./install.sh -y              # auto-accept the end-of-install reboot prompt
 #
 set -euo pipefail
 
@@ -17,12 +18,15 @@ log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m!!\033[0m %s\n' "$*" >&2; }
 
 # --- flags ------------------------------------------------------------------
-# Skip the interactive private-assets prompt (see scripts/20-private.sh) by
-# exporting DOTS_PRIVATE for the imperative installers.
+# --private/--no-private set DOTS_PRIVATE for the private-assets step (see
+# scripts/20-private.sh). -y auto-accepts the reboot prompt (private assets have
+# their own flag and are unaffected).
+DOTS_YES=0
 for arg in "$@"; do
   case "$arg" in
     --private)    export DOTS_PRIVATE=1 ;;
     --no-private) export DOTS_PRIVATE=0 ;;
+    -y|--yes)     DOTS_YES=1 ;;
     *) err "unknown flag: $arg"; exit 1 ;;
   esac
 done
@@ -79,3 +83,29 @@ if [ -d "$DOTS_DIR/scripts" ]; then
 fi
 
 log "done"
+
+# --- offer a reboot ---------------------------------------------------------
+# Several changes only fully apply after a restart: KDE global shortcuts
+# (kglobalacceld reloads kglobalshortcutsrc at login), keyd, the appearance/panel
+# session settings, and any freshly-installed kernel/driver bits. A reboot is the
+# clean way to pick them all up. -y accepts without asking; otherwise prompt when
+# interactive (default No) and skip silently when non-interactive.
+# SIGKILL kglobalacceld right before rebooting so it can't save its stale
+# in-memory shortcuts over what 90-kde-shortcuts.sh just wrote (it may have
+# respawned while this prompt waited). Then reboot immediately — the fresh boot
+# loads the correct kglobalshortcutsrc. See 90-kde-shortcuts.sh for the why.
+do_reboot() {
+  pkill -9 -x kglobalacceld 2>/dev/null || true
+  log "rebooting"
+  systemctl reboot 2>/dev/null || sudo reboot
+}
+if [ "$DOTS_YES" = "1" ]; then
+  do_reboot
+elif [ -t 0 ] && [ -t 1 ]; then
+  read -rp "$(printf '\033[1;34m==>\033[0m Reboot now to apply all changes? [y/N] ')" ans
+  if [[ "$ans" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+    do_reboot
+  else
+    log "skipped reboot — reboot (or at least log out/in) later to apply shortcuts/keyd/appearance"
+  fi
+fi

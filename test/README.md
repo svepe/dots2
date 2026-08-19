@@ -16,37 +16,71 @@ Nothing here is committed except the scripts — the ISO and disk image live in
   then re-login.
 - ~10 GB free for the ISO + disk (grows to the `DISK_SIZE`, default 40 GB).
 
-## One-time: install the OS
+## Preparing the golden snapshot (one-time)
+
+Build a reusable base image once. After this, every test is just `revert golden`
+→ `run` → one command in the guest (see "Each test run"). To recreate the setup
+later on a different machine, follow these same steps.
+
+**1. Fetch the ISO** (downloaded + checksum-verified into `test/var/`):
 
 ```bash
-./test/vm.sh iso        # download + checksum-verify the Kubuntu 26.04 ISO
-./test/vm.sh install    # opens a QEMU window; click through Calamares
+./test/vm.sh iso
 ```
 
-In the installer: pick **Minimal installation**, skip third-party drivers, use
-the whole (virtual) disk. Create a user you'll remember. When it finishes,
-**power the guest off** (don't reboot into the live session).
+**2. Install Kubuntu** — opens a QEMU window running the Calamares installer:
 
-Then make the shared repo auto-mount so you never hand-mount it. Boot once with
-the share attached (`./test/vm.sh run`) and, in the guest:
+```bash
+./test/vm.sh install
+```
+
+In the installer: choose **Minimal installation**, skip third-party drivers,
+**erase the whole (virtual) disk**, and create a user you'll remember. When it
+finishes, **power the guest off** — do not reboot into the live session.
+
+**3. Wire the repo share to auto-mount.** `vm.sh run` shares this repo over 9p
+under the mount tag `dots`; a one-line fstab entry mounts it at `/mnt/dots` on
+every boot, so testing never hand-mounts. Boot with the share attached:
+
+```bash
+./test/vm.sh run
+```
+
+then, **in the guest**:
 
 ```bash
 sudo mkdir -p /mnt/dots
 echo 'dots  /mnt/dots  9p  trans=virtio,version=9p2000.L,ro,nofail,x-systemd.automount  0  0' \
   | sudo tee -a /etc/fstab
 sudo systemctl daemon-reload && sudo mount -a
-ls /mnt/dots/test    # sanity check
+ls /mnt/dots/test        # sanity check → lists vm.sh, guest-setup.sh, README.md
 ```
 
-`nofail` keeps boot from hanging if the share isn't attached; `x-systemd.automount`
-mounts on first access, dodging any boot-order race with the virtio device.
+- `dots` — the 9p `mount_tag` set by `vm.sh run`.
+- `ro` — read-only, so the guest can never mutate the host repo.
+- `nofail` — don't hang boot if the share isn't attached (e.g. a plain `run`).
+- `x-systemd.automount` — mount on first access, avoiding a boot-order race with
+  the virtio device.
 
-Power the guest off, then freeze this clean, auto-mounting install as the golden
-image you return to between test runs:
+**4. (Optional) SSH server** — install it now if you want to paste into the guest
+from the host (`ssh -p 2222 <user>@localhost`, port forwarded by `vm.sh`):
 
 ```bash
-./test/vm.sh snapshot golden     # VM must be off; re-run to refresh it
+sudo apt install -y openssh-server
 ```
+
+**5. Power off and snapshot** — freeze this clean, auto-mounting install as
+`golden`:
+
+```bash
+# in the guest:
+sudo poweroff
+# on the host, once the QEMU window closes:
+./test/vm.sh snapshot golden     # VM must be off; re-run any time to refresh it
+```
+
+`golden` now holds a pristine Kubuntu with the share wired to auto-mount — you
+never touch fstab again.
 
 ## Each test run: install the dotfiles
 

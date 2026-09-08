@@ -46,7 +46,11 @@ install_ttfs "$FALLBACK_SRC" "Hack (fallback)"
 fc-cache -f "$DEST" >/dev/null 2>&1 || true
 
 # --- pick the active family -------------------------------------------------
-if fc-list | grep -qi "$MONO_FAMILY"; then
+# Ask fontconfig for the family directly rather than piping fc-list into
+# `grep -q`: grep exits at the first match, fc-list dies of SIGPIPE (status 141),
+# and under `set -o pipefail` that makes the whole condition false — so the
+# private font installed fine and was then never selected, on every host.
+if [ -n "$(fc-list ":family=$MONO_FAMILY" family)" ]; then
   FAMILY="$MONO_FAMILY"
 else
   FAMILY="$FALLBACK_FAMILY"

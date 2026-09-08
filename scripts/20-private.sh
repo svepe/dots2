@@ -46,6 +46,11 @@ if [ -d "$DEST/.git" ]; then
 elif [ -d "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null)" ]; then
   log "private/ already present (not a git clone) — using as-is"
 else
-  git clone "$REPO" "$DEST" && log "cloned private/" \
+  # BatchMode + a known-hosts bypass so an unattended install (VM harness, CI,
+  # `curl | bash` on a machine with no GitHub key) fails fast instead of blocking
+  # on a passphrase or an "authenticity of host github.com" prompt with no one
+  # there to answer. Failure here is non-fatal by design.
+  GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=accept-new" \
+    git clone "$REPO" "$DEST" && log "cloned private/" \
     || log "could not clone $REPO (no access?) — skipping private assets"
 fi

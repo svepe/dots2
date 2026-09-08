@@ -70,7 +70,56 @@ def encode(sequence):
     return value | key
 
 
+# Canonical spelling per key code, for turning daemon replies back into names.
+NAMES = {v: k for k, v in [
+    ("Left", 0x01000012), ("Up", 0x01000013),
+    ("Right", 0x01000014), ("Down", 0x01000015),
+    ("Return", 0x01000004), ("Enter", 0x01000005),
+    ("PgUp", 0x01000016), ("PgDown", 0x01000017),
+    ("Home", 0x01000010), ("End", 0x01000011),
+    ("Esc", 0x01000000), ("Tab", 0x01000001), ("Backtab", 0x01000002),
+    ("Backspace", 0x01000003), ("Space", 0x20),
+    ("Ins", 0x01000006), ("Del", 0x01000007),
+    ("Print", 0x01000009), ("Menu", 0x01000055),
+    ("Screensaver", 0x010000BA),
+]}
+NAMES.update({c: chr(c) for c in range(ord("A"), ord("Z") + 1)})
+NAMES.update({0x30 + d: str(d) for d in range(10)})
+NAMES.update({0x01000030 + (n - 1): f"F{n}" for n in range(1, 36)})
+
+
+def decode_key(value):
+    """The inverse of encode(), for readable failure messages."""
+    names = []
+    for name, bit in (("Meta", 0x10000000), ("Ctrl", 0x04000000),
+                      ("Alt", 0x08000000), ("Shift", 0x02000000)):
+        if value & bit:
+            names.append(name)
+            value &= ~bit
+    names.append(NAMES.get(value, f"0x{value:08x}"))
+    return "+".join(names)
+
+
+def decode(raw):
+    """Turn a busctl `a(ai)` reply back into "Meta+L;Screensaver"."""
+    tokens = raw.split()
+    if not tokens:
+        return "none"
+    count, i, sequences = int(tokens[0]), 1, []
+    for _ in range(count):
+        length = int(tokens[i]); i += 1
+        keys = [int(t) for t in tokens[i:i + length]]; i += length
+        sequences.append("+".join(decode_key(k) for k in keys if k) or "none")
+    return ";".join(sequences) or "none"
+
+
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == "--decode":
+        try:
+            print(decode(sys.argv[2]))
+        except (ValueError, IndexError):
+            print(sys.argv[2])
+        return
     if len(sys.argv) != 2:
         sys.exit(__doc__)
     raw = sys.argv[1].strip()

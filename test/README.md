@@ -108,6 +108,19 @@ changes, then inspect:
 - nvim: `:checkhealth`, LSP, treesitter highlight, which-key (`<leader>`)
 - keyd: Caps → Ctrl/Esc dual-role
 - KDE: dark theme, 5×3 virtual desktops, cursor size, custom panel
+- KDE global shortcuts — **assert these, don't eyeball them**:
+
+  ```bash
+  ~/.dots2/scripts/90-kde-shortcuts.sh --check
+  ```
+
+  It reads every binding back out of the shortcuts daemon and exits non-zero on
+  any that isn't active, naming the ones that are wrong. Run it *after* the log
+  out and back in: that is the step that proves the config survived the daemon
+  writing its in-memory copy over the file on the way out, which is exactly the
+  regression that once shipped a host with stock defaults everywhere. Then press
+  a few yourself — `Meta+T` (alacritty+tmux), `Ctrl+Alt+T` (plain alacritty),
+  `Meta+W` (Firefox), `Meta+H`/`Meta+L` (quick tile), `Alt+1` (focus window 1).
 
 ## Re-testing the installer
 

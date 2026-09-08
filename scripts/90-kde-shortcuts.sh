@@ -19,7 +19,19 @@
 # at login. There is therefore no separate process to restart or kill; talking
 # to the D-Bus name is the only way to reach whichever one is in charge.
 #
+# Run with --check to assert instead of apply: every binding below is read back
+# from the running daemon and compared, writing nothing and registering nothing.
+# After a reboot that verifies what the *config* alone produced, which is the
+# regression that made a fresh install come up with stock defaults.
+#
 set -euo pipefail
+
+CHECK=0
+case "${1:-}" in
+  --check) CHECK=1 ;;
+  "")      ;;
+  *)       echo "usage: $(basename "$0") [--check]" >&2; exit 2 ;;
+esac
 
 if ! command -v kwriteconfig6 >/dev/null 2>&1; then
   echo "kwriteconfig6 not found (not a KDE Plasma 6 session), skipping KDE shortcuts"
@@ -33,7 +45,7 @@ SRC="$HOME/.config/$FILE"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 
 # --- backup before touching anything ----------------------------------------
-if [ -f "$SRC" ]; then
+if [ "$CHECK" = "0" ] && [ -f "$SRC" ]; then
   bak="$SRC.bak.$(date +%Y%m%d-%H%M%S)"
   cp "$SRC" "$bak"
   log "backed up $FILE -> $(basename "$bak")"
@@ -49,6 +61,10 @@ live_daemon() {
         org.freedesktop.DBus NameHasOwner s org.kde.kglobalaccel 2>/dev/null)" = "b true" ]
 }
 if live_daemon; then LIVE=1; else LIVE=0; fi
+if [ "$CHECK" = "1" ] && [ "$LIVE" = "0" ]; then
+  echo "no shortcuts daemon on the session bus — run --check from inside a Plasma session" >&2
+  exit 2
+fi
 
 # --- appliers ----------------------------------------------------------------
 # Config format is "active,default,friendly name"; alternative key sequences are
@@ -71,8 +87,30 @@ set_live() {
     setForeignShortcutKeys 'asa(ai)' 4 "$component" "$action" "" "" $encoded >/dev/null
 }
 
+# Read a binding back out of the daemon and compare it with what we intended.
+# Deliberately does not register anything first, so --check after a reboot
+# reports what the config produced on its own.
+FAILED=0
+CHECKED=0
+check_live() {
+  local component="$1" action="$2" active="$3" want got
+  want="$(python3 "$KEYSEQ" "$active")"
+  got="$(busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+          shortcutKeys as 4 "$component" "$action" "" "" 2>/dev/null | sed 's/^a(ai) //')"
+  CHECKED=$((CHECKED + 1))
+  if [ "$got" != "$want" ]; then
+    FAILED=$((FAILED + 1))
+    printf '\033[1;31m  ✗\033[0m %-34s want %-28s got %s\n' \
+      "$action" "${active:-none}" "$(python3 "$KEYSEQ" --decode "$got" 2>/dev/null || echo "$got")"
+  fi
+}
+
 apply() {
   local component="$1" action="$2" active="$3" default="$4" friendly="$5"
+  if [ "$CHECK" = "1" ]; then
+    check_live "$component" "$action" "$active"
+    return 0
+  fi
   write_config "$component" "$action" "$active" "$default" "$friendly"
   [ "$LIVE" = "1" ] && set_live "$component" "$action" "$active"
   return 0
@@ -182,7 +220,16 @@ launcher() {
   local keys="$1"; shift
   local id candidate name
   if ! id="$(desktop_id "$@")"; then
-    log "no desktop entry found for $* — skipping its $keys shortcut"
+    if [ "$CHECK" = "1" ]; then
+      FAILED=$((FAILED + 1)); CHECKED=$((CHECKED + 1))
+      printf '\033[1;31m  ✗\033[0m %-34s no desktop entry among: %s\n' "$keys" "$*"
+    else
+      log "no desktop entry found for $* — skipping its $keys shortcut"
+    fi
+    return 0
+  fi
+  if [ "$CHECK" = "1" ]; then
+    check_live "$id" "_launch" "$keys"
     return 0
   fi
   # Clear any binding left on a candidate we did not pick, so re-running after a
@@ -214,7 +261,15 @@ launcher "Meta+W"     firefox_firefox.desktop firefox.desktop firefox-esr.deskto
 # Free Ctrl+Alt+T from Konsole's built-in launcher default.
 launcher "none"       org.kde.konsole.desktop
 
-if [ "$LIVE" = "1" ]; then
+if [ "$CHECK" = "1" ]; then
+  if [ "$FAILED" = "0" ]; then
+    log "all $CHECKED shortcuts are live in this session"
+  else
+    printf '\033[1;31m!!\033[0m %s of %s shortcuts are not active in this session\n' \
+      "$FAILED" "$CHECKED" >&2
+    exit 1
+  fi
+elif [ "$LIVE" = "1" ]; then
   log "wrote shortcuts to $SRC and applied them to the running session"
 else
   log "wrote shortcuts to $SRC — they load at the next login"

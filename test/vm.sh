@@ -21,7 +21,8 @@ RELEASE="${RELEASE:-26.04}"          # match the host (Ubuntu/Kubuntu 26.04 LTS)
 CPUS="${CPUS:-4}"
 RAM_MB="${RAM_MB:-8192}"
 DISK_SIZE="${DISK_SIZE:-40G}"
-SSH_PORT="${SSH_PORT:-2222}"          # host:2222 -> guest:22 (if you add sshd)
+SSH_PORT="${SSH_PORT:-2222}"          # host:2222 -> guest:22 (guest runs sshd)
+GUEST_USER="${GUEST_USER:-test}"      # the user created during the Calamares install
 VM_NAME="kubuntu-dots-test"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +30,8 @@ REPO_ROOT="$(cd "$HERE/.." && pwd)"   # shared into the guest (read-only) over 9
 VAR="$HERE/var"                       # big artifacts live here (gitignored)
 DISK="$VAR/disk.qcow2"
 NVRAM="$VAR/OVMF_VARS.fd"
+SSH_KEY="$VAR/id_vm"                  # harness keypair; authorized once, rides in golden
+KNOWN_HOSTS="$VAR/known_hosts"        # per-VM, so reinstalls never trip the host-key check
 BASE_URL="https://cdimage.ubuntu.com/kubuntu/releases/${RELEASE}/release"
 
 OVMF_CODE="/usr/share/OVMF/OVMF_CODE_4M.fd"
@@ -49,7 +52,28 @@ preflight() {
   [ -f "$OVMF_CODE" ] || die "OVMF firmware missing: $OVMF_CODE (sudo apt install ovmf)"
   [ -f "$OVMF_VARS_TMPL" ] || die "OVMF vars template missing: $OVMF_VARS_TMPL"
   mkdir -p "$VAR"
+  ensure_key
 }
+
+# The guest authorizes this key once during prep (see README step 3) by reading
+# the .pub off the 9p share, so it has to exist before the guest first boots.
+ensure_key() {
+  mkdir -p "$VAR"
+  [ -f "$SSH_KEY" ] && return 0
+  log "generating harness SSH key: $SSH_KEY"
+  ssh-keygen -t ed25519 -N '' -C 'dots2-vm-harness' -f "$SSH_KEY" >/dev/null
+}
+
+# BatchMode: we only ever authenticate with the key above, so a guest that has
+# not authorized it should fail immediately rather than sit on a password prompt.
+guest_ssh() {
+  ssh -p "$SSH_PORT" -i "$SSH_KEY" \
+      -o IdentitiesOnly=yes -o BatchMode=yes \
+      -o StrictHostKeyChecking=no -o UserKnownHostsFile="$KNOWN_HOSTS" \
+      -o ConnectTimeout=10 -o LogLevel=ERROR \
+      "$GUEST_USER@127.0.0.1" "$@"
+}
+ssh_preflight() { require ssh; ensure_key; }
 
 # --- subcommands ------------------------------------------------------------
 cmd_iso() {
@@ -59,8 +83,11 @@ cmd_iso() {
   curl -fSL "$BASE_URL/SHA256SUMS" -o "$sums" \
     || die "couldn't fetch SHA256SUMS — is Kubuntu $RELEASE released? try RELEASE=25.10 ./test/vm.sh iso"
   local name
+  # Point releases are listed alongside the GA image; take the newest, which is
+  # what a fresh install would actually be and keeps the guest's Plasma close to
+  # the host's (KDE shortcut behaviour is version-sensitive — see 90-kde-shortcuts.sh).
   name="$(grep -oE '[a-f0-9]{64} \*?kubuntu-[^ ]*-desktop-amd64\.iso' "$sums" \
-          | sed -E 's/.*\*?(kubuntu-.*)/\1/' | head -1)"
+          | sed -E 's/.*\*?(kubuntu-.*)/\1/' | sort -V | tail -1)"
   [ -n "$name" ] || die "no desktop-amd64 ISO listed in SHA256SUMS"
   local dest="$VAR/$name"
   if [ -f "$dest" ]; then log "ISO already present: $dest"; else
@@ -119,6 +146,58 @@ cmd_run() {
   exec "${QEMU[@]}"
 }
 
+cmd_ssh() {
+  ssh_preflight
+  if [ "$#" -eq 0 ]; then guest_ssh; else guest_ssh "$@"; fi
+}
+
+cmd_wait() {
+  ssh_preflight
+  local i
+  for i in $(seq 1 60); do
+    guest_ssh true 2>/dev/null && { log "guest reachable over ssh"; return 0; }
+    sleep 5
+  done
+  die "guest not reachable on :$SSH_PORT after 5 min — is it booted, and has it
+authorized $SSH_KEY.pub? (README step 3)"
+}
+
+# Make the guest self-sufficient, from the host. Idempotent: re-running after a
+# revert, or against an already-prepared guest, changes nothing.
+#
+#   fstab     — the 9p share auto-mounts at /mnt/dots on every boot
+#   autologin — SDDM boots straight into a Plasma Wayland session, so a reboot
+#               brings up KWin (and with it the shortcuts daemon) with nobody at
+#               the screen. Without this, an SSH-driven check after a reboot has
+#               no session bus to talk to and cannot tell "broken" from "nobody
+#               logged in yet".
+cmd_prepare() {
+  ssh_preflight
+  local entry='dots  /mnt/dots  9p  trans=virtio,version=9p2000.L,ro,nofail,x-systemd.automount  0  0'
+  log "preparing the guest (9p automount + Plasma autologin)"
+  guest_ssh "set -e
+    sudo mkdir -p /mnt/dots
+    if grep -qF ' /mnt/dots ' /etc/fstab; then echo 'fstab entry already present'
+    else printf '%s\n' '$entry' | sudo tee -a /etc/fstab >/dev/null; echo 'fstab entry added'; fi
+    sudo systemctl daemon-reload
+    sudo mount -a
+    ls /mnt/dots/test >/dev/null && echo 'share mounted: /mnt/dots'
+
+    sudo mkdir -p /etc/sddm.conf.d
+    printf '[Autologin]\nUser=%s\nSession=plasma\n' \"\$USER\" \
+      | sudo tee /etc/sddm.conf.d/99-autologin.conf >/dev/null
+    echo \"autologin set for \$USER (plasma wayland)\""
+}
+
+# The shortcut assertion needs the guest's *session* bus, which an SSH login
+# does not inherit — point at it explicitly. Requires a logged-in Plasma
+# session, which autologin above guarantees after a reboot.
+cmd_check() {
+  ssh_preflight
+  guest_ssh 'export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+             ~/.dots2/scripts/90-kde-shortcuts.sh --check'
+}
+
 require_off() {
   # qemu-img refuses to touch a disk a running qemu has open; give a clear hint.
   if pgrep -af "name $VM_NAME" >/dev/null 2>&1; then
@@ -153,11 +232,16 @@ Kubuntu test VM harness
   ./test/vm.sh install             boot the installer (one-time GUI install)
   ./test/vm.sh snapshot [name]     snapshot the disk (VM off; default 'golden')
   ./test/vm.sh run                 boot the installed guest, share repo over 9p
+  ./test/vm.sh wait                block until the guest answers SSH
+  ./test/vm.sh ssh [cmd...]        run a command in the guest (or open a shell)
+  ./test/vm.sh prepare             9p automount + Plasma autologin (over SSH)
+  ./test/vm.sh check               assert the KDE shortcuts are live in the guest
   ./test/vm.sh revert [name]       roll the disk back to a snapshot (VM off)
   ./test/vm.sh snapshots           list snapshots
   ./test/vm.sh clean               delete test/var (ISO + disk)
 
 Env overrides: RELEASE=$RELEASE CPUS=$CPUS RAM_MB=$RAM_MB DISK_SIZE=$DISK_SIZE
+               GUEST_USER=$GUEST_USER SSH_PORT=$SSH_PORT
 EOF
 }
 
@@ -165,6 +249,10 @@ case "${1:-}" in
   iso)        cmd_iso ;;
   install)    cmd_install ;;
   run)        cmd_run ;;
+  wait)       cmd_wait ;;
+  ssh)        shift; cmd_ssh "$@" ;;
+  prepare)    cmd_prepare ;;
+  check)      cmd_check ;;
   snapshot)   shift; cmd_snapshot "$@" ;;
   revert)     shift; cmd_revert "$@" ;;
   snapshots)  cmd_snapshots ;;

@@ -119,7 +119,10 @@ _Decisions:_
 - Applied imperatively by **`scripts/90-kde-shortcuts.sh`** (via `kwriteconfig6`), not stowed — Plasma rewrites `kglobalshortcutsrc` in place.
 - **App-launch shortcuts are the tricky part:** under `[services][<desktop-id>.desktop]`, `_launch` **must** be a **bare** key sequence (e.g. `_launch=Meta+T`), byte-for-byte matching what System Settings writes. The 3-field `active,default,friendly` form shows in the UI but the grab is **never installed** — this was the original bug.
 - **When a launcher key collides with a built-in KWin action** (e.g. `Meta+T` = Edit Tiles), remap that action's **active** field (1st of the `active,default,friendly` triple) to a free key — `Edit Tiles=Meta+Alt+T,Meta+T,…` (keep KWin's default in the 2nd field). Disabling it instead (`none,Meta+T,…`) also works if you don't want the action at all.
-- Confirmed reproducible from a clean boot: `kwriteconfig6` alone installs the grabs at session start — no GUI/D-Bus step needed.
+- **Writing the config file is not enough.** The shortcuts daemon keeps its own in-memory copy and writes it back over `kglobalshortcutsrc` when the session ends, so a `kwriteconfig6`-only run is silently undone at the next logout and the machine boots with stock defaults. `90-kde-shortcuts.sh` therefore writes the file **and** pushes each binding into the running daemon over D-Bus (`setForeignShortcutKeys`, what System Settings uses), keeping the two copies in agreement. Key sequences are text in the file but packed ints on D-Bus; `scripts/lib/qt-keyseq.py` converts them.
+- **On Plasma ≥ 6.5 Wayland the daemon is `kwin_wayland` itself** — it owns the `org.kde.kglobalaccel` D-Bus name and the standalone `kglobalacceld` exits immediately at login. There is no separate process to restart or kill, so anything keyed off the `kglobalacceld` process name is a no-op; address the D-Bus name instead.
+- **Desktop ids differ by packaging** — Firefox is `firefox.desktop` as a deb but `firefox_firefox.desktop` as a snap (Kubuntu's default). A `_launch` on an id that resolves to nothing fails silently, so the script resolves the id against `XDG_DATA_DIRS` and clears the candidates it didn't pick.
+- **Launchers need one extra call.** The daemon builds a component per `[services]` entry at *startup*, so a launcher that isn't in the file yet is unknown to it and setting a key on it silently does nothing. `doRegister` builds the component from the desktop id first — the daemon reads the entry itself, so it stays a real launcher rather than a stub bound to our D-Bus call. With that, the whole set applies in-session; no logout, no restarts.
 - **Keyboard input** (input-level, not global shortcuts, but related):
   - `scripts/45-kde-keyboard.sh` → XKB options in `kxkbrc`: `caps:escape`; layouts `us,bg` (Bulgarian phonetic) with `grp:alt_shift_toggle` so `Alt+Shift` cycles them; and `plasmarc [OSD] kbdLayoutChangedEnabled=false` to suppress the layout-change popup.
   - `scripts/70-keyd.sh` → installs `system/keyd/default.conf` to `/etc/keyd/` (needs `sudo`; not stowed, `/etc` is root-owned). Provides what XKB can't on Wayland: dual-role **Caps** (tap Esc / hold Ctrl — supersedes the XKB `caps:escape` fallback) and a **grave nav layer** (hold `` ` `` then `hjkl` / `1..9` → the focus shortcuts, home-row ergonomic). keyd remaps at the evdev layer, so tap/hold works.
@@ -130,8 +133,9 @@ _Shortcuts:_
 Application launchers
 | Shortcut | Launches | Desktop id |
 |----------|----------|------------|
-| `Meta+T` | Alacritty | `Alacritty.desktop` |
-| `Meta+W` | Firefox | `firefox.desktop` |
+| `Meta+T` | Alacritty attached to tmux | `alacritty-tmux.desktop` (stowed) |
+| `Ctrl+Alt+T` | Plain Alacritty | `Alacritty.desktop` (freed from Konsole) |
+| `Meta+W` | Firefox | `firefox_firefox.desktop` (snap) or `firefox.desktop` (deb) |
 
 Window & desktop actions — my binding vs the KDE default. "Default kept?" = whether
 the original default still works too (added) or was replaced (its active binding removed).

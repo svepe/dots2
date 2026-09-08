@@ -2,9 +2,22 @@
 #
 # KDE (Plasma 6) global keyboard shortcuts — declarative and idempotent.
 # Not stowed (Plasma rewrites its config in place); applied by install.sh.
-# Writes ~/.config/kglobalshortcutsrc via kwriteconfig6.
 #
-# Shortcut value format: "active,default,friendly name" (use "none" to disable).
+# Shortcuts live in two places and BOTH have to agree:
+#
+#   1. ~/.config/kglobalshortcutsrc, which the shortcuts daemon reads at login.
+#   2. The daemon's in-memory table, which it writes back over that file when
+#      the session ends.
+#
+# Writing only the file loses the race: the daemon saves its (unchanged) copy
+# on logout and the file is back to defaults by the next boot. So each binding
+# is written to the config AND pushed into the running daemon over D-Bus, which
+# is what System Settings does and what makes the change stick.
+#
+# On Plasma >= 6.5 Wayland the daemon is kwin_wayland itself — it owns the
+# org.kde.kglobalaccel name and the standalone kglobalacceld exits immediately
+# at login. There is therefore no separate process to restart or kill; talking
+# to the D-Bus name is the only way to reach whichever one is in charge.
 #
 set -euo pipefail
 
@@ -13,6 +26,8 @@ if ! command -v kwriteconfig6 >/dev/null 2>&1; then
   exit 0
 fi
 
+DOTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+KEYSEQ="$DOTS_DIR/scripts/lib/qt-keyseq.py"
 FILE=kglobalshortcutsrc
 SRC="$HOME/.config/$FILE"
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -24,108 +39,183 @@ if [ -f "$SRC" ]; then
   log "backed up $FILE -> $(basename "$bak")"
 fi
 
-# --- remap the KWin actions that own Meta+T / Meta+W onto Meta+Alt+<key> -----
-# Value is "active,default,friendly": active moves to Meta+Alt+<key>, KWin's
-# default (2nd field) is preserved. This keeps the actions usable and frees the
-# bare Meta+<key> for the launchers below.
-kwriteconfig6 --file "$FILE" --group kwin --key "Edit Tiles" "Meta+Alt+T,Meta+T,Toggle Tiles Editor"
-kwriteconfig6 --file "$FILE" --group kwin --key "Overview"   "Meta+Alt+W,Meta+W,Toggle Overview"
+# --- is a shortcuts daemon actually running? --------------------------------
+# False during an install from a TTY or over SSH, where the config write is
+# both necessary and sufficient — nothing is live to clobber it.
+live_daemon() {
+  [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ] || return 1
+  command -v busctl >/dev/null 2>&1 || return 1
+  [ "$(busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus NameHasOwner s org.kde.kglobalaccel 2>/dev/null)" = "b true" ]
+}
+if live_daemon; then LIVE=1; else LIVE=0; fi
 
-# --- preference remaps -------------------------------------------------------
-# Add Meta+Return for Maximize, keeping the default Meta+PgUp active too.
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Maximize" \
-  "$(printf 'Meta+Return\tMeta+PgUp,Meta+PgUp,Maximize Window')"
+# --- appliers ----------------------------------------------------------------
+# Config format is "active,default,friendly name"; alternative key sequences are
+# tab-separated. The table below uses ";" for those so the entries stay readable.
+write_config() {
+  local component="$1" action="$2" active="$3" default="$4" friendly="$5"
+  kwriteconfig6 --file "$FILE" --group "$component" --key "$action" \
+    "${active//;/$'\t'},${default//;/$'\t'},$friendly"
+}
 
-# Lock screen on Ctrl+Alt+O (+ Screensaver key). Meta+L is intentionally dropped
-# here — it is reused below for vim-style Quick Tile Right.
-kwriteconfig6 --file "$FILE" --group ksmserver --key "Lock Session" \
-  "$(printf 'Ctrl+Alt+O\tScreensaver,Meta+L\tScreensaver,Lock Session')"
+# Push into the running daemon. Only ever affects components that have already
+# registered their actions; for anything else it is a silent no-op (see the
+# application launchers below).
+set_live() {
+  local component="$1" action="$2" active="$3" encoded
+  encoded="$(python3 "$KEYSEQ" "$active")" || return 1
+  # $encoded is a pre-split busctl argument list, so it must stay unquoted.
+  # shellcheck disable=SC2086
+  busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+    setForeignShortcutKeys 'asa(ai)' 4 "$component" "$action" "" "" $encoded >/dev/null
+}
 
-# --- vim-style window tiling -------------------------------------------------
-# Meta+H/J/K/L mirror Meta+Left/Down/Up/Right for Quick Tile, added as extra
-# bindings (tab-separated) alongside the arrow keys.
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Quick Tile Left" \
-  "$(printf 'Meta+Left\tMeta+H,Meta+Left,Quick Tile Window to the Left')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Quick Tile Bottom" \
-  "$(printf 'Meta+Down\tMeta+J,Meta+Down,Quick Tile Window to the Bottom')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Quick Tile Top" \
-  "$(printf 'Meta+Up\tMeta+K,Meta+Up,Quick Tile Window to the Top')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Quick Tile Right" \
-  "$(printf 'Meta+Right\tMeta+L,Meta+Right,Quick Tile Window to the Right')"
+apply() {
+  local component="$1" action="$2" active="$3" default="$4" friendly="$5"
+  write_config "$component" "$action" "$active" "$default" "$friendly"
+  [ "$LIVE" = "1" ] && set_live "$component" "$action" "$active"
+  return 0
+}
 
-# Close window on Alt+Q as well as the default Alt+F4.
-kwriteconfig6 --file "$FILE" --group kwin --key "Window Close" \
-  "$(printf 'Alt+F4\tAlt+Q,Alt+F4,Close Window')"
+# --- the bindings ------------------------------------------------------------
+# component | action | active | default | friendly name
+# "none" as the active binding disables the shortcut. Defaults are preserved as
+# written by KWin so System Settings can still offer "reset to default".
+SHORTCUTS=(
+  # Layout switching lives on Alt+Shift (grp:alt_shift_toggle, see
+  # 45-kde-keyboard.sh), so these are redundant. Disable them FIRST: they hold
+  # Meta+Alt+K/L, which spatial focus claims further down, and the daemon drops
+  # a binding that is still taken when it is applied.
+  # These two carry an empty friendly name because that is what Plasma itself
+  # stores for them; writing a label here just gets rewritten on the next save.
+  "KDE Keyboard Layout Switcher|Switch to Next Keyboard Layout|none|Meta+Alt+K|"
+  "KDE Keyboard Layout Switcher|Switch to Last-Used Keyboard Layout|none|Meta+Alt+L|"
 
-# --- free Meta+Alt+K / Meta+Alt+L for the spatial-focus KWin script ----------
-# Layout switching lives on Alt+Shift (grp:alt_shift_toggle, see 45-kde-keyboard.sh),
-# so these kglobalaccel layout switchers are redundant — disable their active
-# binding to free Meta+Alt+K/L for spatial focus (up/right).
-kwriteconfig6 --file "$FILE" --group "KDE Keyboard Layout Switcher" \
-  --key "Switch to Next Keyboard Layout" "none,Meta+Alt+K,Switch to Next Keyboard Layout"
-kwriteconfig6 --file "$FILE" --group "KDE Keyboard Layout Switcher" \
-  --key "Switch to Last-Used Keyboard Layout" "none,Meta+Alt+L,Switch to Last-Used Keyboard Layout"
+  # Free the bare Meta+T / Meta+W for the launchers below by moving the KWin
+  # actions that own them onto Meta+Alt+<key>.
+  "kwin|Edit Tiles|Meta+Alt+T|Meta+T|Toggle Tiles Editor"
+  "kwin|Overview|Meta+Alt+W|Meta+W|Toggle Overview"
 
-# --- vim-style desktop navigation --------------------------------------------
-# Switch the active desktop with Ctrl+Alt+<h/j/k/l or arrow>. The KDE defaults
-# (Meta+Ctrl+<arrow>) are disabled — active holds only our combos; the default
-# is kept in the 2nd field for reference.
-kwriteconfig6 --file "$FILE" --group kwin --key "Switch One Desktop to the Left" \
-  "$(printf 'Ctrl+Alt+H\tCtrl+Alt+Left,Meta+Ctrl+Left,Switch One Desktop to the Left')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Switch One Desktop Down" \
-  "$(printf 'Ctrl+Alt+J\tCtrl+Alt+Down,Meta+Ctrl+Down,Switch One Desktop Down')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Switch One Desktop Up" \
-  "$(printf 'Ctrl+Alt+K\tCtrl+Alt+Up,Meta+Ctrl+Up,Switch One Desktop Up')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Switch One Desktop to the Right" \
-  "$(printf 'Ctrl+Alt+L\tCtrl+Alt+Right,Meta+Ctrl+Right,Switch One Desktop to the Right')"
+  # Preference remaps. Meta+L is intentionally dropped from Lock Session — it is
+  # reused just below for vim-style Quick Tile Right.
+  "kwin|Window Maximize|Meta+Return;Meta+PgUp|Meta+PgUp|Maximize Window"
+  "ksmserver|Lock Session|Ctrl+Alt+O;Screensaver|Meta+L;Screensaver|Lock Session"
+  "kwin|Window Close|Alt+F4;Alt+Q|Alt+F4|Close Window"
 
-# Move the window to another desktop with Meta+Ctrl+Alt+<h/j/k/l or arrow>. KDE
-# defaults (Meta+Ctrl+Shift+<arrow>) disabled the same way.
-kwriteconfig6 --file "$FILE" --group kwin --key "Window One Desktop to the Left" \
-  "$(printf 'Meta+Ctrl+Alt+H\tMeta+Ctrl+Alt+Left,Meta+Ctrl+Shift+Left,Window One Desktop to the Left')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window One Desktop Down" \
-  "$(printf 'Meta+Ctrl+Alt+J\tMeta+Ctrl+Alt+Down,Meta+Ctrl+Shift+Down,Window One Desktop Down')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window One Desktop Up" \
-  "$(printf 'Meta+Ctrl+Alt+K\tMeta+Ctrl+Alt+Up,Meta+Ctrl+Shift+Up,Window One Desktop Up')"
-kwriteconfig6 --file "$FILE" --group kwin --key "Window One Desktop to the Right" \
-  "$(printf 'Meta+Ctrl+Alt+L\tMeta+Ctrl+Alt+Right,Meta+Ctrl+Shift+Right,Window One Desktop to the Right')"
+  # vim-style window tiling: Meta+H/J/K/L alongside the arrow keys.
+  "kwin|Window Quick Tile Left|Meta+Left;Meta+H|Meta+Left|Quick Tile Window to the Left"
+  "kwin|Window Quick Tile Bottom|Meta+Down;Meta+J|Meta+Down|Quick Tile Window to the Bottom"
+  "kwin|Window Quick Tile Top|Meta+Up;Meta+K|Meta+Up|Quick Tile Window to the Top"
+  "kwin|Window Quick Tile Right|Meta+Right;Meta+L|Meta+Right|Quick Tile Window to the Right"
 
-# --- spatial-focus KWin script bindings --------------------------------------
-# The spatial-focus script registers these actions, but kglobalaccel autoloads
-# whatever is saved here and ignores the script's built-in default. If a key was
-# momentarily unavailable at first registration (e.g. Meta+Alt+K/L held by the
-# layout switcher during login) it gets saved empty and stays broken. Writing
-# them explicitly makes the bindings deterministic regardless of login timing.
-kwriteconfig6 --file "$FILE" --group kwin --key "Focus Window Left"  "Meta+Alt+H,none,Focus Window Left"
-kwriteconfig6 --file "$FILE" --group kwin --key "Focus Window Down"  "Meta+Alt+J,none,Focus Window Down"
-kwriteconfig6 --file "$FILE" --group kwin --key "Focus Window Up"    "Meta+Alt+K,none,Focus Window Up"
-kwriteconfig6 --file "$FILE" --group kwin --key "Focus Window Right" "Meta+Alt+L,none,Focus Window Right"
+  # vim-style desktop navigation. The KDE defaults (Meta+Ctrl+<arrow>) are
+  # dropped from the active set but kept in the default field for reference.
+  "kwin|Switch One Desktop to the Left|Ctrl+Alt+H;Ctrl+Alt+Left|Meta+Ctrl+Left|Switch One Desktop to the Left"
+  "kwin|Switch One Desktop Down|Ctrl+Alt+J;Ctrl+Alt+Down|Meta+Ctrl+Down|Switch One Desktop Down"
+  "kwin|Switch One Desktop Up|Ctrl+Alt+K;Ctrl+Alt+Up|Meta+Ctrl+Up|Switch One Desktop Up"
+  "kwin|Switch One Desktop to the Right|Ctrl+Alt+L;Ctrl+Alt+Right|Meta+Ctrl+Right|Switch One Desktop to the Right"
+
+  # Move the window to another desktop, same scheme one modifier up.
+  "kwin|Window One Desktop to the Left|Meta+Ctrl+Alt+H;Meta+Ctrl+Alt+Left|Meta+Ctrl+Shift+Left|Window One Desktop to the Left"
+  "kwin|Window One Desktop Down|Meta+Ctrl+Alt+J;Meta+Ctrl+Alt+Down|Meta+Ctrl+Shift+Down|Window One Desktop Down"
+  "kwin|Window One Desktop Up|Meta+Ctrl+Alt+K;Meta+Ctrl+Alt+Up|Meta+Ctrl+Shift+Up|Window One Desktop Up"
+  "kwin|Window One Desktop to the Right|Meta+Ctrl+Alt+L;Meta+Ctrl+Alt+Right|Meta+Ctrl+Shift+Right|Window One Desktop to the Right"
+
+  # Bindings for the spatial-focus KWin script. It registers these actions with
+  # no default of its own, so writing them here is what gives them keys at all.
+  "kwin|Focus Window Left|Meta+Alt+H|none|Focus Window Left"
+  "kwin|Focus Window Down|Meta+Alt+J|none|Focus Window Down"
+  "kwin|Focus Window Up|Meta+Alt+K|none|Focus Window Up"
+  "kwin|Focus Window Right|Meta+Alt+L|none|Focus Window Right"
+)
 for i in 1 2 3 4 5 6 7 8 9; do
-  kwriteconfig6 --file "$FILE" --group kwin --key "Focus Window $i" "Alt+$i,none,Focus Window $i"
+  SHORTCUTS+=("kwin|Focus Window $i|Alt+$i|none|Focus Window $i")
+done
+
+for entry in "${SHORTCUTS[@]}"; do
+  IFS='|' read -r component action active default friendly <<<"$entry"
+  apply "$component" "$action" "$active" "$default" "$friendly"
 done
 
 # --- application launch shortcuts on the freed keys -------------------------
 # Under [services][<desktop-id>.desktop], _launch MUST be a BARE key sequence,
-# exactly as System Settings writes it. The 3-field "key,default,friendly" form
-# shows in the UI but the grab is never installed — this was the original bug.
-#   Meta+T       -> alacritty running tmux (alacritty-tmux.desktop, stowed)
-#   Ctrl+Alt+T   -> plain alacritty (freed from Konsole's default launcher)
-kwriteconfig6 --file "$FILE" --group services --group "alacritty-tmux.desktop" --key "_launch" "Meta+T"
-kwriteconfig6 --file "$FILE" --group services --group "Alacritty.desktop"      --key "_launch" "Ctrl+Alt+T"
-kwriteconfig6 --file "$FILE" --group services --group "firefox.desktop"        --key "_launch" "Meta+W"
+# exactly as System Settings writes it — the 3-field "key,default,friendly" form
+# shows up in the UI but the grab is never installed.
+#
+# The daemon builds a component per [services] entry at startup, so a launcher
+# that is not in the file yet cannot be pushed live and needs the next login.
+# Resolve the desktop id first: the same app ships under different ids depending
+# on packaging (Firefox is firefox.desktop as a deb, firefox_firefox.desktop as
+# a snap), and a shortcut on an id that resolves to nothing silently does nothing.
+IFS=':' read -r -a XDG_APP_DIRS \
+  <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
+desktop_path() {
+  local dir
+  for dir in "${XDG_APP_DIRS[@]}"; do
+    [ -e "$dir/applications/$1" ] && { printf '%s\n' "$dir/applications/$1"; return 0; }
+  done
+  return 1
+}
+
+desktop_id() {
+  local candidate
+  for candidate in "$@"; do
+    desktop_path "$candidate" >/dev/null && { printf '%s\n' "$candidate"; return 0; }
+  done
+  return 1
+}
+
+# The entry's Name=, which is how Plasma labels both the component and its
+# _launch action in the shortcuts UI. Done in one awk so no pipe can trip
+# pipefail on an early exit.
+desktop_name() {
+  local path
+  path="$(desktop_path "$1")" || return 1
+  awk '/^\[Desktop Entry\]/ { in_entry = 1; next }
+       /^\[/               { in_entry = 0 }
+       in_entry && /^Name=/ { print substr($0, 6); exit }' "$path"
+}
+
+launcher() {
+  local keys="$1"; shift
+  local id candidate name
+  if ! id="$(desktop_id "$@")"; then
+    log "no desktop entry found for $* — skipping its $keys shortcut"
+    return 0
+  fi
+  # Clear any binding left on a candidate we did not pick, so re-running after a
+  # repackaging (snap <-> deb changes the id) cannot leave two entries fighting
+  # over the same key.
+  for candidate in "$@"; do
+    [ "$candidate" = "$id" ] && continue
+    kwriteconfig6 --file "$FILE" --group services --group "$candidate" \
+      --key "_launch" --delete 2>/dev/null || true
+  done
+  kwriteconfig6 --file "$FILE" --group services --group "$id" --key "_launch" "$keys"
+  if [ "$LIVE" = "1" ]; then
+    # The daemon builds its launcher components from the [services] entries it
+    # saw at startup, so one added just now is unknown to it and setting a key
+    # on it would silently do nothing. doRegister builds the component from the
+    # desktop id first; the daemon reads the entry itself, so this stays a real
+    # launcher (it runs the app) rather than a stub bound to our D-Bus call.
+    name="$(desktop_name "$id")" || name="$id"
+    busctl --user call org.kde.kglobalaccel /kglobalaccel org.kde.KGlobalAccel \
+      doRegister as 4 "$id" "_launch" "$name" "$name" >/dev/null 2>&1 || true
+    set_live "$id" "_launch" "$keys"
+  fi
+  return 0
+}
+
+launcher "Meta+T"     alacritty-tmux.desktop           # alacritty running tmux (stowed)
+launcher "Ctrl+Alt+T" Alacritty.desktop alacritty.desktop
+launcher "Meta+W"     firefox_firefox.desktop firefox.desktop firefox-esr.desktop
 # Free Ctrl+Alt+T from Konsole's built-in launcher default.
-kwriteconfig6 --file "$FILE" --group services --group "org.kde.konsole.desktop" --key "_launch" "none"
+launcher "none"       org.kde.konsole.desktop
 
-# --- make the writes stick ---------------------------------------------------
-# kglobalacceld caches shortcuts in memory and rewrites this file with that copy
-# on *graceful* exit — so a normal logout, reboot, or `systemctl restart` saves
-# the stale in-memory defaults over what we just wrote, and a respawn (e.g. the
-# plasmashell restart in 62-kde-panel.sh) can clobber it too. That's why this
-# script runs LAST (90-, after the panel/appearance steps) and SIGKILLs the
-# daemon: with no chance to run its save-on-exit handler, our file stands.
-# install.sh then SIGKILLs it once more right before the reboot it prompts for,
-# so nothing respawns and re-clobbers in between; the bindings load cleanly on
-# the fresh boot (KWin re-registers its actions against a daemon that reads them).
-pkill -9 -x kglobalacceld 2>/dev/null || true
-
-log "wrote shortcuts to $SRC and reset kglobalacceld — apply after the reboot install.sh offers"
+if [ "$LIVE" = "1" ]; then
+  log "wrote shortcuts to $SRC and applied them to the running session"
+else
+  log "wrote shortcuts to $SRC — they load at the next login"
+fi

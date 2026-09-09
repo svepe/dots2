@@ -32,6 +32,17 @@ vim.lsp.config("basedpyright", {
   },
 })
 
+-- --query-driver lets clangd run the compiler named in compile_commands.json to
+-- learn its system include paths, instead of guessing a gcc install (it picks
+-- the newest /usr/lib/gcc/*/N, which can be a stub with no libstdc++ headers →
+-- "'algorithm' file not found" on every stdlib include).
+vim.lsp.config("clangd", {
+  cmd = {
+    "clangd",
+    "--query-driver=/usr/bin/c++,/usr/bin/g++,/usr/bin/gcc,/usr/bin/clang++,/usr/bin/*-g++,/usr/bin/*-gcc",
+  },
+})
+
 -- Non-LSP tools mason should keep installed: conform formatters plus the
 -- tree-sitter CLI (required by nvim-treesitter's main branch to build parsers).
 require("mason-tool-installer").setup({

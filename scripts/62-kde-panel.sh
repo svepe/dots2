@@ -28,6 +28,23 @@ fi
 install -Dm644 "$SRC" "$DST"
 log "restored panel layout to $DST"
 
+# --- panel appearance --------------------------------------------------------
+# The snapshot above holds the panel's *contents* (which applets, in what order).
+# Its looks — floating, transparent, 40px thick — live in plasmashellrc instead,
+# keyed by the containment id: "Panel 27" is [Containments][27] in the snapshot.
+# Restoring only the snapshot brings the widgets back on a stock-looking panel,
+# so both halves have to be applied together. Written before the reload below so
+# plasmashell picks them up in the same restart.
+if command -v kwriteconfig6 >/dev/null 2>&1; then
+  kwriteconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 27" --key floating 1
+  kwriteconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 27" --key floatingApplets 1
+  kwriteconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 27" --key panelOpacity 0
+  kwriteconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 27" --key panelVisibility 0
+  kwriteconfig6 --file plasmashellrc --group PlasmaViews --group "Panel 27" --group Defaults \
+    --key thickness 40
+  log "panel appearance: floating, transparent, 40px thick"
+fi
+
 # Reload plasmashell so the new layout takes effect (only if it's running).
 if pgrep -x plasmashell >/dev/null 2>&1; then
   if systemctl --user restart plasma-plasmashell.service >/dev/null 2>&1; then

@@ -103,6 +103,51 @@ vim.keymap.set("n", "<leader>bp", function()
   pcall(vim.cmd.bprevious)
 end, { desc = "Previous buffer" })
 
+-- Visit order, most recent first. vim's own getbufinfo().lastused can't stand
+-- in for this: it has 1-second resolution, so files opened in the same second
+-- are unordered.
+local buf_mru = {}
+vim.api.nvim_create_autocmd("BufEnter", {
+  callback = function(ev)
+    for i, b in ipairs(buf_mru) do
+      if b == ev.buf then
+        table.remove(buf_mru, i)
+        break
+      end
+    end
+    table.insert(buf_mru, 1, ev.buf)
+  end,
+})
+
+local function switchable(b)
+  return b ~= nil
+    and b ~= -1
+    and b ~= vim.api.nvim_get_current_buf()
+    and vim.api.nvim_buf_is_valid(b)
+    and vim.bo[b].buflisted
+end
+
+-- flip to the last buffer (vim's <C-^>) — repeat to toggle between two files.
+-- Deleting a buffer drops you on some neighbour and leaves the alternate
+-- pointing at the buffer you just deleted, so fall back to the newest live
+-- buffer in visit order: the one you were in before. The listed checks keep a
+-- side buffer (neo-tree, a git view) from being pulled into the edit window.
+vim.keymap.set("n", "<leader><Tab>", function()
+  local target = vim.fn.bufnr("#")
+  if not switchable(target) then
+    target = nil
+    for _, b in ipairs(buf_mru) do
+      if switchable(b) then
+        target = b
+        break
+      end
+    end
+  end
+  if target then
+    pcall(vim.cmd.buffer, target)
+  end
+end, { desc = "Last buffer" })
+
 -- scratch: a throwaway [scratch] buffer, reused via a kept handle (created
 -- listed + scratch, so it stays hidden rather than being wiped).
 local scratch_bufnr

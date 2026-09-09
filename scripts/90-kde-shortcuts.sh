@@ -160,6 +160,11 @@ SHORTCUTS=(
   "kwin|Window One Desktop Up|Meta+Ctrl+Alt+K;Meta+Ctrl+Alt+Up|Meta+Ctrl+Shift+Up|Window One Desktop Up"
   "kwin|Window One Desktop to the Right|Meta+Ctrl+Alt+L;Meta+Ctrl+Alt+Right|Meta+Ctrl+Shift+Right|Window One Desktop to the Right"
 
+  # Move the window to the previous/next screen with Meta+Shift+<h/l or arrow>.
+  # H/L follow the usual left/right convention (H = previous/left, L = next/right).
+  "kwin|Window to Previous Screen|Meta+Shift+H;Meta+Shift+Left|Meta+Shift+Left|Move Window to Previous Screen"
+  "kwin|Window to Next Screen|Meta+Shift+L;Meta+Shift+Right|Meta+Shift+Right|Move Window to Next Screen"
+
   # Bindings for the spatial-focus KWin script. It registers these actions with
   # no default of its own, so writing them here is what gives them keys at all.
   "kwin|Focus Window Left|Meta+Alt+H|none|Focus Window Left"

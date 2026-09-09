@@ -8,7 +8,17 @@
 # NOT stowed: plasmashell rewrites this file constantly at runtime, so a symlink
 # into the repo would spew churn. It's also machine/screen-specific. After GUI
 # tweaks, re-snapshot with:
+#   systemctl --user restart plasma-plasmashell.service   # flush; see below
 #   cp ~/.config/plasma-org.kde.plasma.desktop-appletsrc kde/
+#
+# The restart is not optional: plasmashell keeps the layout in memory and only
+# writes it out on exit, so a copy taken straight after a GUI tweak captures the
+# state before it. Plasma also keeps containments for disconnected screens on
+# purpose (so they come back on replug), which means unplugging a monitor does
+# not drop its entries from the snapshot — don't go hunting for them.
+#
+# The panel's appearance is not in that file at all; it lives in plasmashellrc.
+# See the block below, which has to be kept in step with the snapshot by hand.
 #
 set -euo pipefail
 

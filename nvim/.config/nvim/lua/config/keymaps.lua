@@ -58,9 +58,11 @@ vim.keymap.set({ "n", "v" }, "<leader>fs", "<cmd>w<cr>", { desc = "Save file" })
 vim.keymap.set("n", "<leader>ff", function()
   require("telescope.builtin").find_files()
 end, { desc = "Find files" })
-vim.keymap.set("n", "<leader>fd", function()
-  require("telescope.builtin").find_files({ cwd = vim.fn.expand("%:p:h") })
-end, { desc = "Find files (current dir)" })
+-- buffer's own dir, not cwd — falls back to cwd for an unnamed buffer.
+vim.keymap.set("n", "<leader>fb", function()
+  local dir = vim.fn.expand("%:p:h")
+  require("telescope.builtin").find_files({ cwd = dir ~= "" and dir or nil })
+end, { desc = "Find files (buffer dir)" })
 vim.keymap.set("n", "<leader>fr", function()
   require("telescope.builtin").oldfiles()
 end, { desc = "Recent files" })
@@ -175,6 +177,19 @@ vim.keymap.set("n", "<leader>'", function()
   require("telescope.builtin").marks()
 end, { desc = "Marks" })
 
+-- comment (<leader>;): nvim's built-in gc operator, so it composes with motions
+-- and the textobjects below — <leader>;af a whole function, <leader>;j two
+-- lines, <leader>;ap a paragraph — and honours 'commentstring' per filetype
+-- with dot-repeat for free. An operator can't also be a finished action, so the
+-- current line is <leader>;; (3<leader>;; does three lines).
+--
+-- Commenting is linewise only: <leader>;ib comments the whole line rather than
+-- wrapping the parens contents in /* */, since nvim has no block-comment
+-- operator. That needs a plugin and isn't worth one here.
+vim.keymap.set("n", "<leader>;", "gc", { remap = true, desc = "Comment operator" })
+vim.keymap.set("n", "<leader>;;", "gcc", { remap = true, desc = "Toggle comment line" })
+vim.keymap.set("x", "<leader>;", "gc", { remap = true, desc = "Toggle comment" })
+
 -- treesitter textobjects: function/class/argument. Native objects (i"/iw/...)
 -- are intentionally not remapped, so ci"/ciw dot-repeat stays intact.
 local function ts_select(obj)
@@ -246,6 +261,18 @@ vim.keymap.set("n", "<leader>ft", "<cmd>Neotree filesystem reveal left<cr>", { d
 vim.keymap.set("n", "<leader>wd", "<C-w>c", { desc = "Close window" })
 vim.keymap.set("n", "<leader>ws", "<C-w>s", { desc = "Split below" })
 vim.keymap.set("n", "<leader>wv", "<C-w>v", { desc = "Split right" })
+-- zoom like tmux's prefix+z; winrestcmd() restores the exact layout, not <C-w>=.
+vim.keymap.set("n", "<leader>wz", function()
+  if vim.t.zoom_restore then
+    pcall(vim.cmd, vim.t.zoom_restore)
+    vim.t.zoom_restore = nil
+  elseif vim.fn.winnr("$") > 1 then
+    local restore = vim.fn.winrestcmd()
+    vim.cmd("wincmd _") -- maximise height
+    vim.cmd("wincmd |") -- maximise width
+    vim.t.zoom_restore = restore
+  end
+end, { desc = "Zoom window (toggle)" })
 -- jump to window N
 for i = 1, 9 do
   vim.keymap.set("n", "<leader>" .. i, i .. "<C-w>w", { desc = "which_key_ignore" })

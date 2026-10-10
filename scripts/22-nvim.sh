@@ -38,6 +38,17 @@ fi
 NVIM="$(command -v nvim 2>/dev/null || true)"
 [ -z "$NVIM" ] && [ -x /snap/bin/nvim ] && NVIM=/snap/bin/nvim
 if [ -n "$NVIM" ]; then
+  # vim.pack clones with --no-checkout, then checks out. If a previous warm-up
+  # was interrupted in between, the plugin dir holds only .git/ — yet vim.pack
+  # treats any existing dir as installed and never repairs it. Such a clone has
+  # an index that doesn't match HEAD; drop it so vim.pack re-clones it below.
+  for d in "${XDG_DATA_HOME:-$HOME/.local/share}"/nvim/site/pack/core/opt/*/; do
+    [ -d "$d.git" ] || continue
+    if ! git -C "$d" diff --cached --quiet HEAD 2>/dev/null; then
+      log "removing half-installed plugin $(basename "$d") (will re-clone)"
+      rm -rf "$d"
+    fi
+  done
   log "warming up neovim (plugins, LSPs, formatters, treesitter parsers)"
   "$NVIM" --headless -c "luafile $HERE/nvim-warmup.lua" -c "qa!" \
     || log "nvim warm-up incomplete — the first launch will finish it"

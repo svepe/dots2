@@ -216,7 +216,10 @@ end, { desc = "Previous todo" })
 
 -- git (<leader>g): neogit for status/staging/commit; gitsigns for hunk nav.
 vim.keymap.set({ "n", "v" }, "<leader>gs", function()
-  require("neogit").open({ kind = "vsplit" })
+  -- float from side panels; else vsplit while the window can spare the width
+  local kind = vim.bo.buftype ~= "" and "floating"
+    or (vim.api.nvim_win_get_width(0) < 120 and "replace" or "vsplit")
+  require("neogit").open({ kind = kind })
 end, { desc = "Status (neogit)" })
 vim.keymap.set("n", "<leader>gn", function()
   require("gitsigns").nav_hunk("next")

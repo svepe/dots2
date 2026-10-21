@@ -72,6 +72,25 @@ end, { desc = "Help tags" })
 vim.keymap.set("n", "<leader>fk", function()
   require("telescope.builtin").keymaps()
 end, { desc = "Keymaps" })
+
+-- harpoon: slots for the handful of files this task needs. The menu is an
+-- editable buffer — dd to drop, move lines to reorder.
+local function harpoon_slot(n)
+  return function()
+    require("harpoon"):list():select(n)
+  end
+end
+vim.keymap.set("n", "<leader>fa", function()
+  require("harpoon"):list():add()
+end, { desc = "Harpoon add file" })
+vim.keymap.set("n", "<leader>fp", function()
+  local harpoon = require("harpoon")
+  harpoon.ui:toggle_quick_menu(harpoon:list())
+end, { desc = "Harpoon menu" })
+vim.keymap.set("n", "<leader>h", harpoon_slot(1), { desc = "Harpoon 1" })
+vim.keymap.set("n", "<leader>j", harpoon_slot(2), { desc = "Harpoon 2" })
+vim.keymap.set("n", "<leader>k", harpoon_slot(3), { desc = "Harpoon 3" })
+vim.keymap.set("n", "<leader>l", harpoon_slot(4), { desc = "Harpoon 4" })
 vim.keymap.set("n", "<leader>bb", function()
   require("telescope.builtin").buffers()
 end, { desc = "Buffers" })
